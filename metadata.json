@@ -1,0 +1,7 @@
+{
+  "name": "Personal assistant ",
+  "description": "A high-fidelity clone of the WhatsApp Web interface featuring real-time messaging simulation, responsive design, and authentic styling.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

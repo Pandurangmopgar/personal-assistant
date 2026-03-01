@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Production
+build/
+dist/
+
+# Testing
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env*
+!.env.example
+
+# Editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Seed and test scripts (not needed in repo)
+seed-redis.js
+rebuild-seed.js
+seed-redis-part2.js
+merge-messages.js
+add-conversations-batch1.js
+add-conversations-batch2.js
+add-conversations-batch3.js
+add-more-conversations.js
+add-final-batch.js
+add-mega-batch.js
+add-last-130.js
+add-final-300.js
+add-quality-conversations.js
+add-last-week-conversations.js
+add-feb9-11.js
+add-feb12-15.js
+add-feb17-18.js
+add-feb19-20.js
+add-feb21-22.js
+verify-conversations.js
+
+# Memory ingestion and testing scripts
+ingest-initial-memories.js
+ingest-all-memories.js
+clear-memories.js
+check-stored-memories.js
+test-proactive-recall.js
+test-anime-recall.js
+debug-semantic-search.js
+check-one-piece-memory.js
+
+# Test scripts
+test-bedrock.js
+test-azure.js
+
+# Documentation (internal development notes)
+*.md
+!README.md
+!LICENSE.md
