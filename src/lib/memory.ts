@@ -277,7 +277,7 @@ export async function getConversationContext(
     const searchParams: any = {
       query: currentMessage,
       user_id: userId,
-      limit: 5,
+      limit: 30,
       mode: 'hybrid',
     };
 

@@ -198,7 +198,7 @@ export async function handleRecallMemoriesCall(
   }
 
   try {
-    const limit = Math.min(functionArgs.limit || 3, 5); // Max 5
+    const limit = Math.min(functionArgs.limit || 10, 10); // Max 10
 
     // Build time-based filter if specified
     let timeFilter: any = {};

@@ -115,7 +115,7 @@ export async function proactiveRecall(
     const semanticResults = await memory.searchMemories({
       query: message, // Use the actual user message for semantic matching
       user_id: userId,
-      limit: 5,
+      limit: 15,
       mode: 'hybrid', // Hybrid combines semantic + keyword matching
     });
 
@@ -136,7 +136,7 @@ export async function proactiveRecall(
       const explicitResults = await memory.searchMemories({
         query: message,
         user_id: userId,
-        limit: 3,
+        limit: 8,
         mode: 'hybrid',
         filters: {
           significance: ['high', 'critical'],
@@ -167,7 +167,7 @@ export async function proactiveRecall(
       const contextResults = await memory.searchMemories({
         query: recentContext,
         user_id: userId,
-        limit: 2,
+        limit: 5,
         mode: 'hybrid',
       });
 
@@ -209,8 +209,8 @@ function rankAndFilterMemories(memories: ProactiveMemory[]): ProactiveMemory[] {
   // Sort by confidence
   unique.sort((a, b) => b.confidence - a.confidence);
 
-  // Return top 3
-  return unique.slice(0, 3);
+  // Return top 12
+  return unique.slice(0, 12);
 }
 
 // ============================================================================
