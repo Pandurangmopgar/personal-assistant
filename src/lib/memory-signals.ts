@@ -38,48 +38,48 @@ export interface MemorySignal {
 // ============================================================================
 
 export class MemorySignalDetector {
-  
+
   /**
    * Main entry point: Analyze conversation and decide what to store
    */
   async detectSignals(context: ConversationContext): Promise<MemorySignal[]> {
     const signals: MemorySignal[] = [];
-    
+
     // 1. Extract facts (names, dates, preferences, etc.)
     const factSignals = this.detectFacts(context);
     signals.push(...factSignals);
-    
+
     // 2. Detect emotional moments (important for human-like recall)
     const emotionalSignals = this.detectEmotionalMoments(context);
     signals.push(...emotionalSignals);
-    
+
     // 3. Identify preferences and dislikes
     const preferenceSignals = this.detectPreferences(context);
     signals.push(...preferenceSignals);
-    
+
     // 4. Capture experiences and stories
     const experienceSignals = this.detectExperiences(context);
     signals.push(...experienceSignals);
-    
+
     // 5. Track goals and intentions
     const goalSignals = this.detectGoals(context);
     signals.push(...goalSignals);
-    
+
     // 6. Recognize habits and patterns
     const habitSignals = this.detectHabits(context);
     signals.push(...habitSignals);
-    
+
     return signals.filter(s => s.shouldStore);
   }
-  
+
   // --------------------------------------------------------------------------
   // 1. FACT DETECTION
   // --------------------------------------------------------------------------
-  
+
   private detectFacts(context: ConversationContext): MemorySignal[] {
     const signals: MemorySignal[] = [];
     const message = context.userMessage.toLowerCase();
-    
+
     // Name detection
     const namePatterns = [
       /my name is (\w+)/i,
@@ -87,7 +87,7 @@ export class MemorySignalDetector {
       /call me (\w+)/i,
       /mera naam (\w+) hai/i,
     ];
-    
+
     for (const pattern of namePatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -102,14 +102,14 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     // Birthday detection
     const birthdayPatterns = [
       /my birthday is (.+)/i,
       /born on (.+)/i,
       /mera birthday (.+) hai/i,
     ];
-    
+
     for (const pattern of birthdayPatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -124,7 +124,7 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     // Location detection
     const locationPatterns = [
       /i live in (\w+)/i,
@@ -132,7 +132,7 @@ export class MemorySignalDetector {
       /mai (\w+) se hu/i,
       /mai (\w+) mai rehta/i,
     ];
-    
+
     for (const pattern of locationPatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -147,18 +147,18 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     return signals;
   }
-  
+
   // --------------------------------------------------------------------------
   // 2. EMOTIONAL MOMENT DETECTION
   // --------------------------------------------------------------------------
-  
+
   private detectEmotionalMoments(context: ConversationContext): MemorySignal[] {
     const signals: MemorySignal[] = [];
     const message = context.userMessage.toLowerCase();
-    
+
     // High emotional intensity indicators
     const emotionalPatterns = [
       { pattern: /nervous|scared|dar|ghabra/i, emotion: 'nervous' as const, intensity: 0.8 },
@@ -167,12 +167,12 @@ export class MemorySignalDetector {
       { pattern: /frustrated|angry|gussa|irritate/i, emotion: 'frustrated' as const, intensity: 0.7 },
       { pattern: /love|pyaar|adore/i, emotion: 'happy' as const, intensity: 0.9 },
     ];
-    
+
     for (const { pattern, emotion, intensity } of emotionalPatterns) {
       if (pattern.test(message)) {
         // Check if there's a specific event mentioned
         const hasEvent = /when|jab|woh din|that time|remember/.test(message);
-        
+
         if (hasEvent) {
           signals.push({
             shouldStore: true,
@@ -191,18 +191,18 @@ export class MemorySignalDetector {
         }
       }
     }
-    
+
     return signals;
   }
-  
+
   // --------------------------------------------------------------------------
   // 3. PREFERENCE DETECTION
   // --------------------------------------------------------------------------
-  
+
   private detectPreferences(context: ConversationContext): MemorySignal[] {
     const signals: MemorySignal[] = [];
     const message = context.userMessage.toLowerCase();
-    
+
     // Like/Love patterns
     const likePatterns = [
       /i like (.+)/i,
@@ -212,7 +212,7 @@ export class MemorySignalDetector {
       /mujhe (.+) pasand hai/i,
       /mai (.+) pasand karta/i,
     ];
-    
+
     for (const pattern of likePatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -227,7 +227,7 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     // Dislike patterns
     const dislikePatterns = [
       /i don'?t like (.+)/i,
@@ -236,7 +236,7 @@ export class MemorySignalDetector {
       /mujhe (.+) pasand nahi/i,
       /mai (.+) nahi pasand karta/i,
     ];
-    
+
     for (const pattern of dislikePatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -251,18 +251,18 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     return signals;
   }
-  
+
   // --------------------------------------------------------------------------
   // 4. EXPERIENCE DETECTION
   // --------------------------------------------------------------------------
-  
+
   private detectExperiences(context: ConversationContext): MemorySignal[] {
     const signals: MemorySignal[] = [];
     const message = context.userMessage.toLowerCase();
-    
+
     // Past experiences
     const experiencePatterns = [
       /i went to (.+)/i,
@@ -272,7 +272,7 @@ export class MemorySignalDetector {
       /yaad hai jab (.+)/i,
       /woh din jab (.+)/i,
     ];
-    
+
     for (const pattern of experiencePatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -287,18 +287,18 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     return signals;
   }
-  
+
   // --------------------------------------------------------------------------
   // 5. GOAL DETECTION
   // --------------------------------------------------------------------------
-  
+
   private detectGoals(context: ConversationContext): MemorySignal[] {
     const signals: MemorySignal[] = [];
     const message = context.userMessage.toLowerCase();
-    
+
     const goalPatterns = [
       /i want to (.+)/i,
       /i'?m planning to (.+)/i,
@@ -307,7 +307,7 @@ export class MemorySignalDetector {
       /mai (.+) karna chahta/i,
       /mujhe (.+) karna hai/i,
     ];
-    
+
     for (const pattern of goalPatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -322,18 +322,18 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     return signals;
   }
-  
+
   // --------------------------------------------------------------------------
   // 6. HABIT DETECTION
   // --------------------------------------------------------------------------
-  
+
   private detectHabits(context: ConversationContext): MemorySignal[] {
     const signals: MemorySignal[] = [];
     const message = context.userMessage.toLowerCase();
-    
+
     const habitPatterns = [
       /i usually (.+)/i,
       /i always (.+)/i,
@@ -342,7 +342,7 @@ export class MemorySignalDetector {
       /mai hamesha (.+)/i,
       /roz mai (.+)/i,
     ];
-    
+
     for (const pattern of habitPatterns) {
       const match = context.userMessage.match(pattern);
       if (match) {
@@ -357,27 +357,27 @@ export class MemorySignalDetector {
         });
       }
     }
-    
+
     return signals;
   }
-  
+
   // --------------------------------------------------------------------------
   // HELPER: Emotion Analysis
   // --------------------------------------------------------------------------
-  
+
   private analyzeEmotion(context: ConversationContext): EmotionalSignals {
     const message = context.userMessage.toLowerCase();
-    
+
     // Emoji detection
     const hasHappyEmoji = /😊|😄|😁|🥰|❤️|💕/.test(context.userMessage);
     const hasSadEmoji = /😢|😭|🥺|😔/.test(context.userMessage);
     const hasExcitedEmoji = /🎉|🎊|✨|🔥/.test(context.userMessage);
-    
+
     // Keyword-based emotion detection
     let emotion: EmotionalSignals['userEmotion'] = 'neutral';
     let intensity = 0.5;
     let sentiment = 0;
-    
+
     if (hasHappyEmoji || /happy|khushi|excited|yay|great|awesome|amazing/.test(message)) {
       emotion = 'happy';
       intensity = 0.8;
@@ -403,33 +403,33 @@ export class MemorySignalDetector {
       intensity = 0.6;
       sentiment = 0.6;
     }
-    
+
     return {
       userEmotion: emotion,
       emotionalIntensity: intensity,
       sentimentScore: sentiment,
     };
   }
-  
+
   // --------------------------------------------------------------------------
   // HELPER: Environmental Context
   // --------------------------------------------------------------------------
-  
+
   private getEnvironmentalContext(context: ConversationContext): EnvironmentalSignals {
     const hour = context.timestamp.getHours();
     const day = context.timestamp.getDay();
     const message = context.userMessage.toLowerCase();
-    
+
     // Time of day
     let timeOfDay: EnvironmentalSignals['timeOfDay'];
     if (hour >= 5 && hour < 12) timeOfDay = 'morning';
     else if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
     else if (hour >= 17 && hour < 21) timeOfDay = 'evening';
     else timeOfDay = 'night';
-    
+
     // Detected contexts from message
     const detectedContext: string[] = [];
-    
+
     if (/weather|rain|barish|sunny|cloud/.test(message)) detectedContext.push('weather');
     if (/food|khana|dinner|lunch|breakfast|chai|coffee/.test(message)) detectedContext.push('food');
     if (/work|office|job|meeting|kaam/.test(message)) detectedContext.push('work');
@@ -437,7 +437,7 @@ export class MemorySignalDetector {
     if (/chess|game|play|khel/.test(message)) detectedContext.push('games');
     if (/friend|family|mom|dad|sister|brother/.test(message)) detectedContext.push('relationships');
     if (/travel|trip|visit|gaya|gayi/.test(message)) detectedContext.push('travel');
-    
+
     return {
       timeOfDay,
       dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day],
@@ -470,14 +470,14 @@ export interface RecallStrategy {
 }
 
 export class MemoryRecallSystem {
-  
+
   /**
    * Decide HOW to recall memories based on current context
    */
   determineRecallStrategy(context: RecallContext): RecallStrategy {
     const { currentMessage, emotionalSignals, environmentalSignals } = context;
     const message = currentMessage.toLowerCase();
-    
+
     // 1. Explicit memory queries (user asking to remember)
     if (/remember|yaad|recall|batao|tell me about/.test(message)) {
       return {
@@ -491,7 +491,7 @@ export class MemoryRecallSystem {
         limit: 5,
       };
     }
-    
+
     // 2. Emotional context (match emotional state)
     if (emotionalSignals.emotionalIntensity > 0.7) {
       return {
@@ -509,7 +509,7 @@ export class MemoryRecallSystem {
         limit: 3,
       };
     }
-    
+
     // 3. Environmental triggers (rain → chai memory)
     if (environmentalSignals.detectedContext.length > 0) {
       return {
@@ -525,7 +525,7 @@ export class MemoryRecallSystem {
         limit: 3,
       };
     }
-    
+
     // 4. Temporal context (time-based recall)
     if (/today|yesterday|last week|pehle|abhi/.test(message)) {
       return {
@@ -539,7 +539,7 @@ export class MemoryRecallSystem {
         limit: 5,
       };
     }
-    
+
     // 5. Default: Semantic search
     return {
       mode: 'hybrid',
@@ -552,7 +552,7 @@ export class MemoryRecallSystem {
       limit: 3,
     };
   }
-  
+
   /**
    * Check if we should proactively surface a memory
    */
@@ -561,7 +561,7 @@ export class MemoryRecallSystem {
     context: RecallContext
   ): { should: boolean; reason: string } {
     const { environmentalSignals, emotionalSignals } = context;
-    
+
     // Check environmental triggers
     if (memory.recall_triggers) {
       for (const trigger of memory.recall_triggers) {
@@ -573,7 +573,7 @@ export class MemoryRecallSystem {
         }
       }
     }
-    
+
     // Check emotional resonance
     if (memory.emotional_context?.user_emotion === emotionalSignals.userEmotion) {
       if (emotionalSignals.emotionalIntensity > 0.6) {
@@ -583,7 +583,7 @@ export class MemoryRecallSystem {
         };
       }
     }
-    
+
     // Check temporal patterns (e.g., morning routine)
     if (memory.memory_type === 'habit') {
       const memoryTime = memory.environmental_context?.timeOfDay;
@@ -594,9 +594,53 @@ export class MemoryRecallSystem {
         };
       }
     }
-    
+
     return { should: false, reason: '' };
   }
+}
+
+// ============================================================================
+// STORAGE PRE-FILTER: Quick check before expensive signal detection
+// Used by fallback paths (Bedrock/rule-based) where LLM doesn't decide storage
+// ============================================================================
+
+const FILLER_WORDS = new Set([
+  'ok', 'okay', 'k', 'kk', 'haan', 'hmm', 'hm', 'yeah', 'yup', 'yep',
+  'nah', 'no', 'nope', 'nahi', 'lol', 'haha', 'hehe', 'nice', 'cool',
+  'achha', 'accha', 'theek', 'thik', 'sahi', 'right', 'wow', 'oh',
+  'aur', 'phir', 'toh', 'bas', 'ji', 'ha', 'na'
+]);
+
+export function shouldStoreMessage(userMessage: string): {
+  shouldStore: boolean;
+  reason: string;
+} {
+  const trimmed = userMessage.trim();
+
+  // 1. Too short (under 3 chars)
+  if (trimmed.length < 3) {
+    return { shouldStore: false, reason: 'Too short - likely filler' };
+  }
+
+  // 2. Emoji-only messages
+  if (/^[\p{Emoji}\s]+$/u.test(trimmed)) {
+    return { shouldStore: false, reason: 'Emoji only - no content' };
+  }
+
+  // 3. Single filler word
+  const lowerTrimmed = trimmed.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+  if (FILLER_WORDS.has(lowerTrimmed)) {
+    return { shouldStore: false, reason: `Filler word: "${lowerTrimmed}"` };
+  }
+
+  // 4. Multi-word but all fillers (e.g., "ok ok", "haan haan")
+  const words = lowerTrimmed.split(/\s+/);
+  if (words.length <= 3 && words.every(w => FILLER_WORDS.has(w))) {
+    return { shouldStore: false, reason: 'All filler words' };
+  }
+
+  // 5. Passed pre-filter — message has substance
+  return { shouldStore: true, reason: 'Message has substance' };
 }
 
 // Export singleton instances

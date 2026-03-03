@@ -5,16 +5,17 @@ import { memory } from './memory';
 
 /**
  * Define the store_memory function for LLM to call
+ * Ira-specific: Hinglish companion memory storage
  */
 export const storeMemoryFunction = {
   name: 'store_memory',
-  description: 'Store important information about the user for future conversations. Only call this when the user shares meaningful information like personal facts, preferences, goals, habits, or experiences. Do NOT call for filler words, greetings, or casual acknowledgments.',
+  description: `Store important information about the user for future conversations. Use when user shares personal facts, feelings, preferences, goals, relationships, or experiences. Do NOT use for filler words (ok, haan, hmm), greetings, or generic reactions. Write content in Hinglish. Example: "User ka naam Pandurang hai", "User ko bhindi pasand hai".`,
   parameters: {
     type: 'object',
     properties: {
       content: {
         type: 'string',
-        description: 'What to remember about the user (e.g., "User\'s name is Pandurang", "User likes bhindi sabji")',
+        description: 'What to remember about the user — write in Hinglish. E.g., "User ka naam Pandurang hai", "User ko chess pasand hai, rating 1600 hai"',
       },
       memory_type: {
         type: 'string',
@@ -29,55 +30,63 @@ export const storeMemoryFunction = {
           'relationship',
           'shared_experience',
           'important_date',
+          'inside_joke',
         ],
-        description: 'Type of memory being stored',
+        description: 'Type of memory: personal_fact (name, birthday), personal_preference (likes), personal_dislike (dislikes), emotional_moment (happy/sad events), relationship (family/friends), etc.',
       },
       significance: {
         type: 'string',
         enum: ['critical', 'high', 'medium', 'low'],
-        description: 'How important this information is (critical: name/birthday, high: preferences/goals, medium: habits, low: casual facts)',
+        description: 'How important: critical (name, birthday), high (preferences, goals, emotions), medium (habits, shared experiences), low (casual mentions)',
       },
       source_type: {
         type: 'string',
         enum: ['text', 'image', 'audio', 'video'],
-        description: 'Where this information came from (text: typed message, image: photo shared, audio: voice message, video: video shared)',
+        description: 'How the info was shared. Default: text',
+      },
+      emotional_tone: {
+        type: 'string',
+        enum: ['happy', 'sad', 'excited', 'nervous', 'frustrated', 'grateful', 'neutral'],
+        description: 'User mood when sharing this. Optional.',
       },
     },
-    required: ['content', 'memory_type', 'significance', 'source_type'],
+    required: ['content', 'memory_type', 'significance'],
   },
 };
 
 /**
  * Define the recall_memories function for LLM to call
+ * Ira-specific: Hinglish companion memory recall
  */
 export const recallMemoriesFunction = {
   name: 'recall_memories',
-  description: 'Search for specific memories about the user. Use this to recall past conversations, preferences, or experiences. Great for temporal queries like "last weekend", "last month", or contextual queries like "food preferences", "weekend activities". Can also filter by source (text, image, audio). Call this proactively to make conversations more personal and engaging.',
+  description: `Search for past memories about the user. Use proactively like a best friend — don't wait to be asked. Examples: if rain is mentioned, recall "chai preferences"; if it's meal time, recall "favourite khana"; if user is sad, recall a happy moment. Write query in simple terms.`,
   parameters: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'What to search for. Can be temporal ("last weekend", "last Monday", "last month"), contextual ("food preferences", "weekend activities", "movies watched"), or specific ("chess rating", "favorite food")',
+        description: 'What to search for. E.g., "favourite food", "chess rating", "birthday", "weekend plans", "happy memories"',
       },
       time_filter: {
         type: 'string',
         enum: ['last_week', 'last_month', 'last_3_months', 'any_time'],
-        description: 'Optional time filter to narrow search',
+        description: 'Time filter for memories. Default: any_time',
       },
       source_filter: {
         type: 'string',
         enum: ['text', 'image', 'audio', 'video', 'any'],
-        description: 'Optional filter by source type (e.g., "image" to recall only photo-based memories)',
+        description: 'Filter by source type. Default: any',
       },
       limit: {
         type: 'number',
-        description: 'Number of memories to retrieve (default: 3, max: 5)',
+        description: 'How many memories to return (default: 3, max: 5)',
       },
     },
     required: ['query'],
   },
 };
+
 
 /**
  * Handle LLM function call to store memory
@@ -97,6 +106,42 @@ export async function handleStoreMemoryCall(
   }
 
   try {
+    // ================================================================
+    // DE-DUPLICATION CHECK: Skip if very similar memory already exists
+    // ================================================================
+    try {
+      const existingMemories = await memory.searchMemories({
+        query: functionArgs.content,
+        user_id: userId,
+        limit: 1,
+        mode: 'hybrid',
+      });
+
+      if (existingMemories.results && existingMemories.results.length > 0) {
+        const topResult = existingMemories.results[0];
+        const similarityScore = topResult.score || 0;
+
+        // If very high similarity (>0.90), skip as duplicate
+        if (similarityScore > 0.90) {
+          console.log('⏭️  Duplicate memory skipped:', {
+            existing: topResult.content?.substring(0, 50) + '...',
+            new: functionArgs.content.substring(0, 50) + '...',
+            similarity: similarityScore.toFixed(3),
+          });
+          return {
+            success: true,
+            message: 'Memory already exists (duplicate skipped)',
+          };
+        }
+      }
+    } catch (dedupError) {
+      // Don't block storage if dedup check fails
+      console.warn('⚠️ Dedup check failed, proceeding with storage:', dedupError);
+    }
+
+    // ================================================================
+    // STORE THE MEMORY
+    // ================================================================
     const metadata = {
       memory_type: functionArgs.memory_type,
       significance: functionArgs.significance,
@@ -145,22 +190,22 @@ export async function handleRecallMemoriesCall(
   userId: string
 ): Promise<{ success: boolean; memories: string[]; message: string }> {
   if (!memory) {
-    return { 
-      success: false, 
-      memories: [], 
-      message: 'Memory system not available' 
+    return {
+      success: false,
+      memories: [],
+      message: 'Memory system not available'
     };
   }
 
   try {
     const limit = Math.min(functionArgs.limit || 3, 5); // Max 5
-    
+
     // Build time-based filter if specified
     let timeFilter: any = {};
     if (functionArgs.time_filter) {
       const now = new Date();
       let startDate: Date;
-      
+
       switch (functionArgs.time_filter) {
         case 'last_week':
           startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -174,7 +219,7 @@ export async function handleRecallMemoriesCall(
         default:
           startDate = new Date(0); // Any time
       }
-      
+
       timeFilter.startDate = startDate;
     }
 
@@ -187,7 +232,7 @@ export async function handleRecallMemoriesCall(
     });
 
     let memories = results.results || [];
-    
+
     // Filter by time if specified
     if (timeFilter.startDate) {
       memories = memories.filter((mem: any) => {
@@ -195,24 +240,24 @@ export async function handleRecallMemoriesCall(
         return memDate >= timeFilter.startDate;
       });
     }
-    
+
     // Filter by source if specified
     if (functionArgs.source_filter && functionArgs.source_filter !== 'any') {
       memories = memories.filter((mem: any) => {
         return mem.metadata?.source_type === functionArgs.source_filter;
       });
     }
-    
+
     // Limit results
     memories = memories.slice(0, limit);
-    
+
     // Format memories with time context and source
     const formattedMemories = memories.map((mem: any) => {
       const timestamp = mem.metadata?.timestamp;
       const sourceType = mem.metadata?.source_type || 'text';
       let timeContext = '';
       let sourceIcon = '';
-      
+
       // Add source icon
       switch (sourceType) {
         case 'image': sourceIcon = '📷 '; break;
@@ -220,7 +265,7 @@ export async function handleRecallMemoriesCall(
         case 'video': sourceIcon = '🎥 '; break;
         default: sourceIcon = '💬 '; break;
       }
-      
+
       if (timestamp) {
         const memDate = new Date(timestamp);
         const now = new Date();
@@ -228,7 +273,7 @@ export async function handleRecallMemoriesCall(
         const diffMins = Math.floor(diffMs / (1000 * 60));
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        
+
         // Format time of day
         const hours = memDate.getHours();
         const minutes = memDate.getMinutes();
@@ -236,7 +281,7 @@ export async function handleRecallMemoriesCall(
         const displayHours = hours % 12 || 12;
         const displayMinutes = minutes.toString().padStart(2, '0');
         const timeOfDay = `${displayHours}:${displayMinutes} ${ampm}`;
-        
+
         // Build context based on recency
         if (diffMins < 60) {
           timeContext = ` (${diffMins} min ago)`;
@@ -263,7 +308,7 @@ export async function handleRecallMemoriesCall(
           timeContext = ` (${monthName} at ${timeOfDay})`;
         }
       }
-      
+
       return `${sourceIcon}${mem.content}${timeContext}`;
     });
 

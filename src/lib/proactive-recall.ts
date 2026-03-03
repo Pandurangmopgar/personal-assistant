@@ -27,40 +27,72 @@ export function shouldTriggerProactiveRecall(
   message: string,
   conversationLength: number
 ): boolean {
-  const lowerMessage = message.toLowerCase();
-  
+  const lowerMessage = message.toLowerCase().trim();
+
+  // ---- SKIP: Messages that don't need recall ----
+
+  // Skip very short messages (< 3 chars) unless they're questions
+  if (lowerMessage.length < 3 && !lowerMessage.includes('?')) {
+    return false;
+  }
+
+  // Skip emoji-only messages
+  if (/^[\p{Emoji}\s]+$/u.test(message.trim())) {
+    return false;
+  }
+
+  // Skip filler words that never need recall
+  const fillerWords = new Set([
+    'ok', 'okay', 'k', 'kk', 'haan', 'hmm', 'hm', 'yeah', 'yup', 'yep',
+    'nah', 'no', 'nope', 'nahi', 'lol', 'haha', 'hehe', 'nice', 'cool',
+    'achha', 'accha', 'theek', 'thik', 'sahi', 'right', 'wow', 'oh',
+    'bas', 'ji', 'ha', 'na', 'bye', 'thanks', 'thx'
+  ]);
+
+  const strippedMessage = lowerMessage.replace(/[^a-z\s]/g, '').trim();
+  if (fillerWords.has(strippedMessage)) {
+    return false;
+  }
+
+  // Skip multi-word but all fillers (e.g., "ok ok", "haan haan", "achha theek")
+  const words = strippedMessage.split(/\s+/);
+  if (words.length <= 3 && words.every(w => fillerWords.has(w))) {
+    return false;
+  }
+
+  // ---- TRIGGER: Messages that need recall ----
+
   // 1. Always recall for first 3 messages (establish context)
   if (conversationLength < 3) {
     return true;
   }
-  
+
   // 2. Explicit memory requests (user asking to remember)
   const explicitMemoryKeywords = [
     'remember', 'yaad', 'recall', 'batao', 'bola tha',
     'last time', 'pehle', 'before', 'earlier', 'previous',
     'told you', 'mentioned', 'kaha tha', 'baat ki thi'
   ];
-  
+
   if (explicitMemoryKeywords.some(keyword => lowerMessage.includes(keyword))) {
     return true;
   }
-  
+
   // 3. Questions (likely need context from past)
   if (message.includes('?') || lowerMessage.includes('kya') || lowerMessage.includes('kaise') || lowerMessage.includes('kaun')) {
     return true;
   }
-  
-  // 4. User mentions topics that likely have stored memories
-  // Keep this minimal - just check if message has substance
-  if (message.trim().split(' ').length >= 3) {
+
+  // 4. Substantive messages (5+ words) — enough content for semantic matching
+  if (message.trim().split(' ').length >= 5) {
     return true;
   }
-  
+
   // 5. Periodic recall (every 5 messages to maintain context)
   if (conversationLength % 5 === 0) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -74,9 +106,9 @@ export async function proactiveRecall(
   conversationHistory: any[]
 ): Promise<ProactiveMemory[]> {
   if (!memory) return [];
-  
+
   const lowerMessage = message.toLowerCase();
-  
+
   try {
     // STRATEGY 1: Direct semantic search with user's message
     // This is the primary strategy - let MemoryStack's semantic search do the work
@@ -86,8 +118,8 @@ export async function proactiveRecall(
       limit: 5,
       mode: 'hybrid', // Hybrid combines semantic + keyword matching
     });
-    
-    const memories: ProactiveMemory[] = (semanticResults.results || []).map((mem: any) => 
+
+    const memories: ProactiveMemory[] = (semanticResults.results || []).map((mem: any) =>
       enrichMemoryWithTimeContext({
         content: mem.content,
         recallReason: 'semantic_match',
@@ -96,11 +128,11 @@ export async function proactiveRecall(
         metadata: mem.metadata,
       })
     );
-    
+
     // STRATEGY 2: If explicit memory request, boost high-significance memories
-    if (lowerMessage.includes('remember') || lowerMessage.includes('yaad') || 
-        lowerMessage.includes('batao') || lowerMessage.includes('bola tha')) {
-      
+    if (lowerMessage.includes('remember') || lowerMessage.includes('yaad') ||
+      lowerMessage.includes('batao') || lowerMessage.includes('bola tha')) {
+
       const explicitResults = await memory.searchMemories({
         query: message,
         user_id: userId,
@@ -110,8 +142,8 @@ export async function proactiveRecall(
           significance: ['high', 'critical'],
         },
       });
-      
-      const explicitMemories = (explicitResults.results || []).map((mem: any) => 
+
+      const explicitMemories = (explicitResults.results || []).map((mem: any) =>
         enrichMemoryWithTimeContext({
           content: mem.content,
           recallReason: 'explicit_request',
@@ -120,10 +152,10 @@ export async function proactiveRecall(
           metadata: mem.metadata,
         })
       );
-      
+
       memories.push(...explicitMemories);
     }
-    
+
     // STRATEGY 3: Add recent conversation context (last 3 messages)
     // This helps maintain conversation flow
     if (conversationHistory.length >= 3) {
@@ -131,15 +163,15 @@ export async function proactiveRecall(
         .slice(-3)
         .map(msg => msg.text)
         .join(' ');
-      
+
       const contextResults = await memory.searchMemories({
         query: recentContext,
         user_id: userId,
         limit: 2,
         mode: 'hybrid',
       });
-      
-      const contextMemories = (contextResults.results || []).map((mem: any) => 
+
+      const contextMemories = (contextResults.results || []).map((mem: any) =>
         enrichMemoryWithTimeContext({
           content: mem.content,
           recallReason: 'conversation_context',
@@ -148,13 +180,13 @@ export async function proactiveRecall(
           metadata: mem.metadata,
         })
       );
-      
+
       memories.push(...contextMemories);
     }
-    
+
     // Rank and deduplicate
     return rankAndFilterMemories(memories);
-    
+
   } catch (error) {
     console.error('Proactive recall error:', error);
     return [];
@@ -173,10 +205,10 @@ function rankAndFilterMemories(memories: ProactiveMemory[]): ProactiveMemory[] {
     seen.add(mem.content);
     return true;
   });
-  
+
   // Sort by confidence
   unique.sort((a, b) => b.confidence - a.confidence);
-  
+
   // Return top 3
   return unique.slice(0, 3);
 }
@@ -189,13 +221,13 @@ function formatTimeContext(timestamp: string): string {
   try {
     const memoryDate = new Date(timestamp);
     const now = new Date();
-    
+
     // Calculate difference in milliseconds
     const diffMs = now.getTime() - memoryDate.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     // Format time of day
     const hours = memoryDate.getHours();
     const minutes = memoryDate.getMinutes();
@@ -203,7 +235,7 @@ function formatTimeContext(timestamp: string): string {
     const displayHours = hours % 12 || 12;
     const displayMinutes = minutes.toString().padStart(2, '0');
     const timeOfDay = `${displayHours}:${displayMinutes} ${ampm}`;
-    
+
     // Format based on recency
     if (diffMins < 60) {
       return `${diffMins} min ago`;
@@ -240,7 +272,7 @@ function formatTimeContext(timestamp: string): string {
 function enrichMemoryWithTimeContext(memory: ProactiveMemory): ProactiveMemory {
   // Extract timestamp from metadata
   const timestamp = memory.metadata?.timestamp || memory.metadata?.date;
-  
+
   if (timestamp) {
     const timeContext = formatTimeContext(timestamp);
     return {
@@ -249,7 +281,7 @@ function enrichMemoryWithTimeContext(memory: ProactiveMemory): ProactiveMemory {
       timeContext,
     };
   }
-  
+
   return memory;
 }
 

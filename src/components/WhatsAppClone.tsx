@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Send, Mic, Plus, Smile, Search, Phone, Video, Check, CheckCheck, Menu, 
+import {
+  Send, Mic, Plus, Smile, Search, Phone, Video, Check, CheckCheck, Menu,
   FileText, Image as ImageIcon, Camera, User, BarChart2, Sticker, Trash2, X, Play, Pause,
   ChevronDown, CornerUpRight, Star, Pin
 } from 'lucide-react';
@@ -1429,8 +1429,8 @@ const AudioMessage = ({ audioUrl, duration, isMe }: { audioUrl: string, duration
       </button>
       <div className="flex-1 flex flex-col gap-1">
         <div className="h-1 bg-gray-300 rounded-full overflow-hidden">
-          <div 
-            className={`h-full ${isMe ? 'bg-[#00a884]' : 'bg-[#54656f]'}`} 
+          <div
+            className={`h-full ${isMe ? 'bg-[#00a884]' : 'bg-[#54656f]'}`}
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -1440,10 +1440,10 @@ const AudioMessage = ({ audioUrl, duration, isMe }: { audioUrl: string, duration
         </div>
       </div>
       <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200">
-         <img src={isMe ? "https://picsum.photos/seed/me/100/100" : CURRENT_USER.avatar} className="w-full h-full object-cover opacity-80" alt="avatar" />
-         <div className="absolute bottom-0 right-0">
-            <Mic size={12} className={isMe ? "text-[#00a884]" : "text-[#54656f]"} />
-         </div>
+        <img src={isMe ? "https://picsum.photos/seed/me/100/100" : CURRENT_USER.avatar} className="w-full h-full object-cover opacity-80" alt="avatar" />
+        <div className="absolute bottom-0 right-0">
+          <Mic size={12} className={isMe ? "text-[#00a884]" : "text-[#54656f]"} />
+        </div>
       </div>
     </div>
   );
@@ -1461,11 +1461,41 @@ export default function WhatsAppClone() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [activeMessageMenu, setActiveMessageMenu] = useState<string | null>(null);
-  
+
+  const getDateLabel = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const msgDate = new Date(dateStr);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Reset times to compare dates only
+      msgDate.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      yesterday.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - msgDate.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays > 1 && diffDays < 7) {
+        return msgDate.toLocaleDateString('en-US', { weekday: 'long' });
+      }
+      // If none of the above, just return the string format
+      return dateStr;
+    } catch (e) {
+      return dateStr; // fallback
+    }
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
   // Load conversation history from Redis on mount
   useEffect(() => {
@@ -1473,7 +1503,7 @@ export default function WhatsAppClone() {
       try {
         const response = await fetch('/api/conversation?userId=pandurang');
         const data = await response.json();
-        
+
         if (data.success && data.messages && data.messages.length > 0) {
           // Convert Redis messages to component format
           const loadedMessages = data.messages.map((msg: any) => ({
@@ -1490,13 +1520,13 @@ export default function WhatsAppClone() {
             audioUrl: msg.audioUrl,
             audioDuration: msg.audioDuration,
           }));
-          
+
           setMessages(loadedMessages);
           console.log('📬 Loaded', loadedMessages.length, 'messages from Redis');
         } else {
           // No history, initialize with INITIAL_MESSAGES and save to Redis
           setMessages(INITIAL_MESSAGES);
-          
+
           // Save initial messages to Redis with their original timestamps
           const redisMessages = INITIAL_MESSAGES.map(msg => ({
             id: msg.id,
@@ -1510,7 +1540,7 @@ export default function WhatsAppClone() {
             isEmoji: msg.isEmoji,
             replyTo: msg.replyTo,
           }));
-          
+
           await fetch('/api/conversation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1519,7 +1549,7 @@ export default function WhatsAppClone() {
               messages: redisMessages,
             }),
           });
-          
+
           console.log('💾 Initialized Redis with', INITIAL_MESSAGES.length, 'messages');
         }
       } catch (error) {
@@ -1529,7 +1559,7 @@ export default function WhatsAppClone() {
         setIsLoadingHistory(false);
       }
     };
-    
+
     loadHistory();
   }, []);
 
@@ -1545,16 +1575,16 @@ export default function WhatsAppClone() {
   useEffect(() => {
     const saveMessages = async () => {
       if (isLoadingHistory || messages.length === 0) return;
-      
+
       try {
         const now = new Date();
-        const currentDate = now.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        const currentDate = now.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
         const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
-        
+
         const redisMessages = messages.map(msg => ({
           id: msg.id,
           sender: msg.sender,
@@ -1569,7 +1599,7 @@ export default function WhatsAppClone() {
           audioUrl: msg.audioUrl,
           audioDuration: msg.audioDuration,
         }));
-        
+
         await fetch('/api/conversation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1578,13 +1608,13 @@ export default function WhatsAppClone() {
             messages: redisMessages,
           }),
         });
-        
+
         console.log('💾 Saved', messages.length, 'messages to Redis');
       } catch (error) {
         console.error('Failed to save messages:', error);
       }
     };
-    
+
     // Debounce saves to avoid too many requests
     const timeoutId = setTimeout(saveMessages, 1000);
     return () => clearTimeout(timeoutId);
@@ -1596,10 +1626,10 @@ export default function WhatsAppClone() {
 
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-    const currentDate = now.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const currentDate = now.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
 
@@ -1661,19 +1691,19 @@ export default function WhatsAppClone() {
             await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400)); // Random delay 800-1200ms
             setIsTyping(false);
           }
-          
+
           const replyDate = new Date();
           const replyTime = replyDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-          const replyDateStr = replyDate.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          const replyDateStr = replyDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           });
           const replyDay = replyDate.toLocaleDateString('en-US', { weekday: 'long' });
-          
+
           // Check if message is just an emoji
           const isEmojiOnly = /^[\p{Emoji}\s]+$/u.test(data.messages[i]);
-          
+
           const replyMessage: Message = {
             id: `${Date.now()}-${i}`,
             text: data.messages[i],
@@ -1685,9 +1715,9 @@ export default function WhatsAppClone() {
             type: 'text',
             isEmoji: isEmojiOnly,
           };
-          
+
           setMessages(prev => [...prev, replyMessage]);
-          
+
           // Small delay between messages
           if (i < data.messages.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200)); // 300-500ms
@@ -1697,13 +1727,13 @@ export default function WhatsAppClone() {
         // Fallback message on error
         const replyDate = new Date();
         const replyTime = replyDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-        const replyDateStr = replyDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        const replyDateStr = replyDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
         const replyDay = replyDate.toLocaleDateString('en-US', { weekday: 'long' });
-        
+
         const replyMessage: Message = {
           id: Date.now().toString(),
           text: "Sorry, I'm having trouble responding right now. Please try again.",
@@ -1719,16 +1749,16 @@ export default function WhatsAppClone() {
     } catch (error) {
       console.error('Error calling chat API:', error);
       setIsTyping(false);
-      
+
       const replyDate = new Date();
       const replyTime = replyDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-      const replyDateStr = replyDate.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const replyDateStr = replyDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
       const replyDay = replyDate.toLocaleDateString('en-US', { weekday: 'long' });
-      
+
       const replyMessage: Message = {
         id: Date.now().toString(),
         text: "Sorry, I encountered an error. Please try again.",
@@ -1796,16 +1826,16 @@ export default function WhatsAppClone() {
   const sendAudioMessage = () => {
     // Stop recording first
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-       mediaRecorderRef.current.stop();
-       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-       setIsRecording(false);
-       if (timerRef.current) clearInterval(timerRef.current);
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
     }
 
     // Wait a bit for the onstop event to fire and blob to be created
     setTimeout(() => {
       const blob = audioBlob || (chunksRef.current.length > 0 ? new Blob(chunksRef.current, { type: 'audio/webm' }) : null);
-      
+
       if (!blob) {
         // Fallback if recording failed or was empty
         console.warn("No audio recorded");
@@ -1833,7 +1863,7 @@ export default function WhatsAppClone() {
       setRecordingDuration(0);
       chunksRef.current = [];
 
-       // Simulate status updates
+      // Simulate status updates
       setTimeout(() => {
         setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' } : m));
       }, 1000);
@@ -1843,6 +1873,49 @@ export default function WhatsAppClone() {
       }, 2000);
 
     }, 200);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Create a local object URL for preview
+    const fileUrl = URL.createObjectURL(file);
+
+    const now = new Date();
+    const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    const currentDate = now.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      sender: 'me',
+      timestamp: timeString,
+      date: currentDate,
+      dayOfWeek: currentDay,
+      status: 'sent',
+      type: 'text', // We don't have a specific type for images/docs yet, so we'll use text with the URL
+      text: type === 'image' ? `📷 Image attached: ${file.name}` : `📄 Document attached: ${file.name}`,
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setShowAttachMenu(false);
+
+    // Reset input
+    e.target.value = '';
+
+    // Simulate status updates
+    setTimeout(() => {
+      setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' } : m));
+    }, 1000);
+
+    setTimeout(() => {
+      setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, status: 'read' } : m));
+    }, 2000);
   };
 
   const formatDuration = (seconds: number) => {
@@ -1859,14 +1932,14 @@ export default function WhatsAppClone() {
     }}>
       {/* Main Container */}
       <div className="relative flex h-full w-full max-w-[1600px] mx-auto bg-[#efeae2] shadow-lg overflow-hidden xl:my-0 xl:h-full xl:w-full">
-        
+
         {/* Background Pattern Overlay */}
-        <div className="absolute inset-0 opacity-40 pointer-events-none z-0" 
-             style={{ 
-               backgroundImage: `url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")`,
-               backgroundRepeat: 'repeat',
-               backgroundSize: '400px'
-             }} 
+        <div className="absolute inset-0 opacity-40 pointer-events-none z-0"
+          style={{
+            backgroundImage: `url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '400px'
+          }}
         />
 
         {/* Header */}
@@ -1887,131 +1960,144 @@ export default function WhatsAppClone() {
 
         {/* Chat Area */}
         <main className="flex-1 flex flex-col w-full h-full pt-[60px] pb-[62px] z-10 relative">
-          
+
           {/* Messages Scroll Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:px-[6%] custom-scrollbar">
-            
+
             {/* Message List */}
             <div className="flex flex-col gap-1 pt-4">
               {messages.map((msg, index) => {
                 const isMe = msg.sender === 'me';
                 const showTail = index === messages.length - 1 || messages[index + 1]?.sender !== msg.sender;
                 const repliedMessage = msg.replyTo ? messages.find(m => m.id === msg.replyTo) : null;
-                
+                const previousMsg = index > 0 ? messages[index - 1] : null;
+                const showDateHeader = !previousMsg || previousMsg.date !== msg.date;
+
                 return (
-                  <motion.div 
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${showTail ? 'mb-2' : 'mb-[2px]'} group`}
-                  >
-                    <div 
-                      className={`
+                  <React.Fragment key={msg.id}>
+                    {/* Date grouping header */}
+                    {showDateHeader && msg.date && (
+                      <div className="flex justify-center my-3 w-full">
+                        <div className="bg-white/90 backdrop-blur-sm text-[#54656f] text-[12.5px] font-medium px-3 py-1.5 rounded-lg shadow-sm border border-black/5">
+                          {getDateLabel(msg.date)}
+                        </div>
+                      </div>
+                    )}
+
+                    <motion.div
+                      key={`msg-${msg.id}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${showTail ? 'mb-2' : 'mb-[2px]'} group`}
+                    >
+                      <div
+                        className={`
                         relative max-w-[85%] sm:max-w-[60%] px-2 py-1.5 rounded-lg shadow-sm text-[14.2px] leading-[19px] text-[#111b21]
                         ${isMe ? 'bg-[#d9fdd3] rounded-tr-none' : 'bg-white rounded-tl-none'}
                         ${msg.isEmoji ? 'text-[40px] bg-transparent shadow-none !p-0' : ''}
                       `}
-                    >
-                      {/* Tail SVG */}
-                      {showTail && !msg.isEmoji && (
-                        <span className={`absolute top-0 ${isMe ? '-right-[8px]' : '-left-[8px]'} w-[8px] h-[13px] overflow-hidden`}>
-                          <svg viewBox="0 0 8 13" width="8" height="13" className={`w-full h-full fill-current ${isMe ? 'text-[#d9fdd3]' : 'text-white'}`}>
-                            <path opacity="0.13" d={isMe ? "M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" : "M1.533 3.568L8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z"}></path>
-                            <path d={isMe ? "M5.188 0H0v11.193l6.467-8.625C7.526 1.156 6.958 0 5.188 0z" : "M1.533 2.568L8 11.193V0H2.812C1.042 0 .474 1.156 1.533 2.568z"}></path>
-                          </svg>
-                        </span>
-                      )}
+                      >
+                        {/* Tail SVG */}
+                        {showTail && !msg.isEmoji && (
+                          <span className={`absolute top-0 ${isMe ? '-right-[8px]' : '-left-[8px]'} w-[8px] h-[13px] overflow-hidden`}>
+                            <svg viewBox="0 0 8 13" width="8" height="13" className={`w-full h-full fill-current ${isMe ? 'text-[#d9fdd3]' : 'text-white'}`}>
+                              <path opacity="0.13" d={isMe ? "M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" : "M1.533 3.568L8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z"}></path>
+                              <path d={isMe ? "M5.188 0H0v11.193l6.467-8.625C7.526 1.156 6.958 0 5.188 0z" : "M1.533 2.568L8 11.193V0H2.812C1.042 0 .474 1.156 1.533 2.568z"}></path>
+                            </svg>
+                          </span>
+                        )}
 
-                      {/* Reply Context */}
-                      {repliedMessage && (
-                        <div className={`mb-1 rounded-[4px] overflow-hidden bg-black/5 border-l-4 ${repliedMessage.sender === 'me' ? 'border-[#00a884]' : 'border-[#a855f7]'} p-1.5 cursor-pointer`}>
-                          <div className={`text-[12.5px] font-medium ${repliedMessage.sender === 'me' ? 'text-[#00a884]' : 'text-[#a855f7]'}`}>
-                            {repliedMessage.sender === 'me' ? 'You' : CURRENT_USER.name}
-                          </div>
-                          <div className="text-[12.5px] text-[#54656f] line-clamp-1">
-                            {repliedMessage.type === 'audio' ? '🎤 Audio Message' : repliedMessage.text}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Message Content */}
-                      {msg.type === 'text' ? (
-                        <div className={`break-words whitespace-pre-wrap ${msg.isEmoji ? 'p-2' : 'pr-20 pb-1 pl-1'}`}>
-                          {msg.text}
-                        </div>
-                      ) : (
-                        <div className="pr-2 pb-1 pl-1">
-                          <AudioMessage audioUrl={msg.audioUrl!} duration={msg.audioDuration!} isMe={isMe} />
-                        </div>
-                      )}
-
-                      {/* Metadata (Time & Status) */}
-                      {!msg.isEmoji && (
-                        <div className="absolute bottom-1 right-2 flex items-center gap-1 select-none">
-                          <span className="text-[11px] text-[#667781]">{msg.timestamp}</span>
-                          {isMe && (
-                            <span className={`text-[16px] ${msg.status === 'read' ? 'text-[#53bdeb]' : 'text-[#667781]'}`}>
-                              {msg.status === 'read' ? <CheckCheck size={16} /> : <Check size={16} />}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Emoji Metadata (Different positioning) */}
-                      {msg.isEmoji && (
-                         <div className={`flex justify-end items-center gap-1 select-none mt-1 px-2 py-1 rounded-full bg-black/5 backdrop-blur-sm w-fit ml-auto ${isMe ? '' : 'mr-auto'}`}>
-                           <span className="text-[10px] text-[#444]">{msg.timestamp}</span>
-                           {isMe && (
-                             <span className={`text-[14px] ${msg.status === 'read' ? 'text-[#00a884]' : 'text-[#666]'}`}>
-                               {msg.status === 'read' ? <CheckCheck size={14} /> : <Check size={14} />}
-                             </span>
-                           )}
-                         </div>
-                      )}
-
-                      {/* Message Dropdown Trigger */}
-                      {!msg.isEmoji && (
-                        <>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id);
-                            }}
-                            className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 ${activeMessageMenu === msg.id ? 'opacity-100' : ''} transition-opacity z-10`}
-                          >
-                            <div className="bg-[#f0f2f5]/50 hover:bg-[#f0f2f5] rounded-full p-1 shadow-sm backdrop-blur-sm">
-                               <ChevronDown size={18} className="text-[#54656f]" />
+                        {/* Reply Context */}
+                        {repliedMessage && (
+                          <div className={`mb-1 rounded-[4px] overflow-hidden bg-black/5 border-l-4 ${repliedMessage.sender === 'me' ? 'border-[#00a884]' : 'border-[#a855f7]'} p-1.5 cursor-pointer`}>
+                            <div className={`text-[12.5px] font-medium ${repliedMessage.sender === 'me' ? 'text-[#00a884]' : 'text-[#a855f7]'}`}>
+                              {repliedMessage.sender === 'me' ? 'You' : CURRENT_USER.name}
                             </div>
-                          </button>
+                            <div className="text-[12.5px] text-[#54656f] line-clamp-1">
+                              {repliedMessage.type === 'audio' ? '🎤 Audio Message' : repliedMessage.text}
+                            </div>
+                          </div>
+                        )}
 
-                          {/* Dropdown Menu */}
-                          <AnimatePresence>
-                            {activeMessageMenu === msg.id && (
-                              <motion.div 
-                                initial={{ opacity: 0, scale: 0.9, y: 0 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: 0 }}
-                                className="absolute top-8 right-4 bg-white rounded-lg shadow-[0_2px_5px_0_rgba(11,20,26,0.26),0_2px_10px_0_rgba(11,20,26,0.16)] py-2 w-52 z-50 flex flex-col origin-top-right"
-                              >
-                                <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3" onClick={() => { setReplyingTo(msg); setActiveMessageMenu(null); }}>Reply</button>
-                                <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">Forward</button>
-                                <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">React</button>
-                                <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">Star</button>
-                                <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">Delete</button>
-                              </motion.div>
+                        {/* Message Content */}
+                        {msg.type === 'text' ? (
+                          <div className={`break-words whitespace-pre-wrap ${msg.isEmoji ? 'p-2' : 'pr-20 pb-1 pl-1'}`}>
+                            {msg.text}
+                          </div>
+                        ) : (
+                          <div className="pr-2 pb-1 pl-1">
+                            <AudioMessage audioUrl={msg.audioUrl!} duration={msg.audioDuration!} isMe={isMe} />
+                          </div>
+                        )}
+
+                        {/* Metadata (Time & Status) */}
+                        {!msg.isEmoji && (
+                          <div className="absolute bottom-1 right-2 flex items-center gap-1 select-none">
+                            <span className="text-[11px] text-[#667781]">{msg.timestamp}</span>
+                            {isMe && (
+                              <span className={`text-[16px] ${msg.status === 'read' ? 'text-[#53bdeb]' : 'text-[#667781]'}`}>
+                                {msg.status === 'read' ? <CheckCheck size={16} /> : <Check size={16} />}
+                              </span>
                             )}
-                          </AnimatePresence>
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
+                          </div>
+                        )}
+
+                        {/* Emoji Metadata (Different positioning) */}
+                        {msg.isEmoji && (
+                          <div className={`flex justify-end items-center gap-1 select-none mt-1 px-2 py-1 rounded-full bg-black/5 backdrop-blur-sm w-fit ml-auto ${isMe ? '' : 'mr-auto'}`}>
+                            <span className="text-[10px] text-[#444]">{msg.timestamp}</span>
+                            {isMe && (
+                              <span className={`text-[14px] ${msg.status === 'read' ? 'text-[#00a884]' : 'text-[#666]'}`}>
+                                {msg.status === 'read' ? <CheckCheck size={14} /> : <Check size={14} />}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Message Dropdown Trigger */}
+                        {!msg.isEmoji && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id);
+                              }}
+                              className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 ${activeMessageMenu === msg.id ? 'opacity-100' : ''} transition-opacity z-10`}
+                            >
+                              <div className="bg-[#f0f2f5]/50 hover:bg-[#f0f2f5] rounded-full p-1 shadow-sm backdrop-blur-sm">
+                                <ChevronDown size={18} className="text-[#54656f]" />
+                              </div>
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            <AnimatePresence>
+                              {activeMessageMenu === msg.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.9, y: 0 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.9, y: 0 }}
+                                  className="absolute top-8 right-4 bg-white rounded-lg shadow-[0_2px_5px_0_rgba(11,20,26,0.26),0_2px_10px_0_rgba(11,20,26,0.16)] py-2 w-52 z-50 flex flex-col origin-top-right"
+                                >
+                                  <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3" onClick={() => { setReplyingTo(msg); setActiveMessageMenu(null); }}>Reply</button>
+                                  <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">Forward</button>
+                                  <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">React</button>
+                                  <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">Star</button>
+                                  <button className="px-4 py-2.5 hover:bg-[#f5f6f6] text-left text-[#3b4a54] text-[14.5px] leading-[14.5px] flex items-center gap-3">Delete</button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  </React.Fragment>
                 );
               })}
-              
+
               {/* Typing Indicator */}
               {isTyping && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex w-full justify-start mb-2"
@@ -2024,20 +2110,20 @@ export default function WhatsAppClone() {
                         <path d="M1.533 2.568L8 11.193V0H2.812C1.042 0 .474 1.156 1.533 2.568z"></path>
                       </svg>
                     </span>
-                    
+
                     <div className="flex gap-1">
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }} 
+                      <motion.div
+                        animate={{ y: [0, -5, 0] }}
                         transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
                         className="w-2 h-2 bg-[#667781] rounded-full"
                       />
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }} 
+                      <motion.div
+                        animate={{ y: [0, -5, 0] }}
                         transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
                         className="w-2 h-2 bg-[#667781] rounded-full"
                       />
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }} 
+                      <motion.div
+                        animate={{ y: [0, -5, 0] }}
                         transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
                         className="w-2 h-2 bg-[#667781] rounded-full"
                       />
@@ -2045,37 +2131,53 @@ export default function WhatsAppClone() {
                   </div>
                 </motion.div>
               )}
-              
+
               <div ref={messagesEndRef} />
             </div>
           </div>
 
           {/* Input Area */}
           <footer className="absolute bottom-0 left-0 right-0 min-h-[62px] bg-[#f0f2f5] px-4 py-2 flex flex-col z-20 border-t border-[#e9edef]">
-            
+
             {/* Attach Menu */}
             <AnimatePresence>
               {showAttachMenu && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   className="absolute bottom-[70px] left-4 bg-white rounded-xl shadow-[0_2px_5px_0_rgba(11,20,26,0.26),0_2px_10px_0_rgba(11,20,26,0.16)] py-2 w-60 z-30 flex flex-col origin-bottom-left"
                 >
-                   <AttachMenuItem icon={FileText} color="text-[#7f66ff]" label="Document" />
-                   <AttachMenuItem icon={ImageIcon} color="text-[#007bfc]" label="Photos & videos" />
-                   <AttachMenuItem icon={Camera} color="text-[#ff2e74]" label="Camera" />
-                   <AttachMenuItem icon={User} color="text-[#009de2]" label="Contact" />
-                   <AttachMenuItem icon={BarChart2} color="text-[#ffbc38]" label="Poll" />
-                   <AttachMenuItem icon={Sticker} color="text-[#00a884]" label="New sticker" />
+                  <AttachMenuItem icon={FileText} color="text-[#7f66ff]" label="Document" onClick={() => documentInputRef.current?.click()} />
+                  <AttachMenuItem icon={ImageIcon} color="text-[#007bfc]" label="Photos & videos" onClick={() => imageInputRef.current?.click()} />
+                  <AttachMenuItem icon={Camera} color="text-[#ff2e74]" label="Camera" onClick={() => alert("Camera API integration required")} />
+                  <AttachMenuItem icon={User} color="text-[#009de2]" label="Contact" onClick={() => setShowAttachMenu(false)} />
+                  <AttachMenuItem icon={BarChart2} color="text-[#ffbc38]" label="Poll" onClick={() => setShowAttachMenu(false)} />
+                  <AttachMenuItem icon={Sticker} color="text-[#00a884]" label="New sticker" onClick={() => setShowAttachMenu(false)} />
                 </motion.div>
               )}
             </AnimatePresence>
 
+            {/* Hidden File Inputs */}
+            <input
+              type="file"
+              ref={imageInputRef}
+              style={{ display: 'none' }}
+              accept="image/*,video/*"
+              onChange={(e) => handleFileUpload(e, 'image')}
+            />
+            <input
+              type="file"
+              ref={documentInputRef}
+              style={{ display: 'none' }}
+              accept="*"
+              onChange={(e) => handleFileUpload(e, 'document')}
+            />
+
             {/* Emoji Picker */}
             <AnimatePresence>
               {showEmojiPicker && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
@@ -2089,7 +2191,7 @@ export default function WhatsAppClone() {
             {/* Reply Preview */}
             <AnimatePresence>
               {replyingTo && (
-                <motion.div 
+                <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -2114,47 +2216,47 @@ export default function WhatsAppClone() {
 
             <div className="flex items-end gap-2 w-full">
               <div className="flex items-center gap-2 mb-2 text-[#54656f]">
-                <button 
+                <button
                   onClick={(e) => { e.stopPropagation(); setShowAttachMenu(!showAttachMenu); }}
                   className={`p-1 rounded-full transition-colors ${showAttachMenu ? 'bg-[#f0f2f5] rotate-45' : 'hover:bg-black/5'}`}
                 >
                   <Plus size={24} className={`transition-transform duration-200 ${showAttachMenu ? 'rotate-45' : ''}`} />
                 </button>
               </div>
-              
+
               {isRecording ? (
                 <div className="flex-1 bg-white rounded-lg flex items-center min-h-[42px] px-4 py-2 shadow-sm border border-white mb-1 justify-between">
-                   <div className="flex items-center gap-3">
-                      <motion.div 
-                        animate={{ opacity: [1, 0.5, 1] }} 
-                        transition={{ repeat: Infinity, duration: 1.5 }}
-                        className="text-red-500"
-                      >
-                        <Mic size={20} fill="currentColor" />
-                      </motion.div>
-                      <span className="text-[#54656f] font-mono text-lg">{formatDuration(recordingDuration)}</span>
-                   </div>
-                   <button onClick={cancelRecording} className="text-[#54656f] hover:text-red-500 transition-colors">
-                      <Trash2 size={20} />
-                   </button>
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      animate={{ opacity: [1, 0.5, 1] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="text-red-500"
+                    >
+                      <Mic size={20} fill="currentColor" />
+                    </motion.div>
+                    <span className="text-[#54656f] font-mono text-lg">{formatDuration(recordingDuration)}</span>
+                  </div>
+                  <button onClick={cancelRecording} className="text-[#54656f] hover:text-red-500 transition-colors">
+                    <Trash2 size={20} />
+                  </button>
                 </div>
               ) : (
-                <form 
+                <form
                   onSubmit={handleSendMessage}
                   className="flex-1 bg-white rounded-lg flex items-center min-h-[42px] px-4 py-2 shadow-sm border border-white focus-within:border-white mb-1"
                 >
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); setShowEmojiPicker(!showEmojiPicker); }}
                     className={`mr-3 hover:text-[#444] transition-colors ${showEmojiPicker ? 'text-[#00a884]' : 'text-[#54656f]'}`}
                   >
                     <Smile size={24} />
                   </button>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Type a message" 
+                    placeholder="Type a message"
                     className="flex-1 bg-transparent outline-none text-[#111b21] placeholder:text-[#667781] text-[15px]"
                   />
                 </form>
@@ -2162,7 +2264,7 @@ export default function WhatsAppClone() {
 
               <div className="flex items-center gap-2 mb-2 text-[#54656f]">
                 {inputText.trim() ? (
-                  <button 
+                  <button
                     onClick={() => handleSendMessage()}
                     className="p-2 bg-[#00a884] text-white rounded-full hover:bg-[#008f6f] transition-colors shadow-sm"
                   >
@@ -2171,14 +2273,14 @@ export default function WhatsAppClone() {
                 ) : (
                   <>
                     {isRecording ? (
-                       <button 
+                      <button
                         onClick={sendAudioMessage}
                         className="p-2 bg-[#00a884] text-white rounded-full hover:bg-[#008f6f] transition-colors shadow-sm"
                       >
                         <Send size={20} fill="white" />
                       </button>
                     ) : (
-                      <button 
+                      <button
                         onClick={startRecording}
                         className="p-2 hover:bg-black/5 rounded-full transition-colors"
                       >
@@ -2192,7 +2294,7 @@ export default function WhatsAppClone() {
           </footer>
         </main>
       </div>
-      
+
       {/* Global Styles for Scrollbar */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
