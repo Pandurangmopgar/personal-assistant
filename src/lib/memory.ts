@@ -293,7 +293,45 @@ export async function getConversationContext(
     }
 
     const context = results.results
-      .map((mem: any) => mem.content)
+      .map((mem: any) => {
+        // Add timestamp context so LLM knows when this was said
+        const timestamp = mem.metadata?.timestamp || mem.metadata?.date;
+        let timeInfo = '';
+        if (timestamp) {
+          try {
+            const memDate = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now.getTime() - memDate.getTime();
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            const hours = memDate.getHours();
+            const minutes = memDate.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+            const displayMinutes = minutes.toString().padStart(2, '0');
+            const timeOfDay = `${displayHours}:${displayMinutes} ${ampm}`;
+
+            if (diffMins < 60) {
+              timeInfo = ` (${diffMins} min ago)`;
+            } else if (diffHours < 24) {
+              timeInfo = ` (${diffHours}h ago at ${timeOfDay})`;
+            } else if (diffDays === 1) {
+              timeInfo = ` (yesterday at ${timeOfDay})`;
+            } else if (diffDays < 7) {
+              const dayName = memDate.toLocaleDateString('en-US', { weekday: 'long' });
+              timeInfo = ` (last ${dayName} at ${timeOfDay})`;
+            } else if (diffDays < 30) {
+              timeInfo = ` (${Math.floor(diffDays / 7)} weeks ago)`;
+            } else {
+              const monthName = memDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              timeInfo = ` (${monthName})`;
+            }
+          } catch { }
+        }
+        return `${mem.content}${timeInfo}`;
+      })
       .join('\n');
 
     return context;
