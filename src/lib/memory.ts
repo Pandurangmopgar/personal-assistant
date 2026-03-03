@@ -34,37 +34,37 @@ export interface ConversationMemory {
 // Enhanced metadata for MemoryStack
 export interface EnhancedMemoryMetadata {
   // Custom Ira-specific memory types (MemoryStack supports custom types)
-  memory_type: 
-    // Personal Information
-    | 'personal_fact'        // Name, age, birthday, location
-    | 'personal_preference'  // Likes, favorites, choices
-    | 'personal_dislike'     // Dislikes, avoidances
-    | 'personal_goal'        // Wants, plans, aspirations
-    | 'personal_habit'       // Routines, patterns, behaviors
-    | 'personal_skill'       // Abilities, knowledge, expertise
-    
-    // Emotional & Social
-    | 'emotional_moment'     // Significant emotional experiences
-    | 'relationship'         // People, connections, social context
-    | 'shared_experience'    // Stories, events, memories together
-    | 'inside_joke'          // Jokes, references, shared humor
-    
-    // Contextual
-    | 'conversation_context' // General conversation memory
-    | 'temporal_pattern'     // Time-based patterns (morning routine, etc.)
-    | 'environmental_trigger'// Weather, location-based memories
-    | 'cultural_reference'   // Hinglish, Indian cultural context
-    
-    // Insights & Learning
-    | 'behavioral_insight'   // Learned patterns about user
-    | 'preference_evolution' // How preferences change over time
-    | 'proactive_suggestion' // Things Ira suggested that worked
-    
-    // Special
-    | 'important_date'       // Birthdays, anniversaries, events
-    | 'sensitive_topic'      // Topics to handle carefully
-    | 'conversation_style';  // How user likes to communicate
-  
+  memory_type:
+  // Personal Information
+  | 'personal_fact'        // Name, age, birthday, location
+  | 'personal_preference'  // Likes, favorites, choices
+  | 'personal_dislike'     // Dislikes, avoidances
+  | 'personal_goal'        // Wants, plans, aspirations
+  | 'personal_habit'       // Routines, patterns, behaviors
+  | 'personal_skill'       // Abilities, knowledge, expertise
+
+  // Emotional & Social
+  | 'emotional_moment'     // Significant emotional experiences
+  | 'relationship'         // People, connections, social context
+  | 'shared_experience'    // Stories, events, memories together
+  | 'inside_joke'          // Jokes, references, shared humor
+
+  // Contextual
+  | 'conversation_context' // General conversation memory
+  | 'temporal_pattern'     // Time-based patterns (morning routine, etc.)
+  | 'environmental_trigger'// Weather, location-based memories
+  | 'cultural_reference'   // Hinglish, Indian cultural context
+
+  // Insights & Learning
+  | 'behavioral_insight'   // Learned patterns about user
+  | 'preference_evolution' // How preferences change over time
+  | 'proactive_suggestion' // Things Ira suggested that worked
+
+  // Special
+  | 'important_date'       // Birthdays, anniversaries, events
+  | 'sensitive_topic'      // Topics to handle carefully
+  | 'conversation_style';  // How user likes to communicate
+
   // Emotional context
   emotional_context?: {
     user_emotion: string;
@@ -72,7 +72,7 @@ export interface EnhancedMemoryMetadata {
     emotional_trigger?: string;
     ira_response_tone: string;
   };
-  
+
   // Recall triggers
   recall_triggers?: {
     keywords: string[];
@@ -80,23 +80,23 @@ export interface EnhancedMemoryMetadata {
     temporal: string[];
     environmental: string[];
   };
-  
+
   // Significance
   significance?: 'critical' | 'high' | 'medium' | 'low';
-  
+
   // Additional metadata
   topic?: string;
   keywords?: string[];
   timestamp?: string;
   category?: string;
-  
+
   // Time context
   time_context?: {
     time_of_day: 'morning' | 'afternoon' | 'evening' | 'night';
     day_of_week: string;
     is_weekend: boolean;
   };
-  
+
   // Ira-specific tags
   ira_tags?: {
     conversation_depth?: 'casual' | 'deep' | 'emotional' | 'playful';
@@ -104,6 +104,8 @@ export interface EnhancedMemoryMetadata {
     response_quality?: 'excellent' | 'good' | 'needs_improvement';
     follow_up_needed?: boolean;
     proactive_recall_success?: boolean;
+    original_language?: string;
+    preserve_language?: boolean;
   };
 }
 
@@ -116,13 +118,13 @@ export async function storeConversationMemory(
   enhancedMetadata?: Partial<EnhancedMemoryMetadata>
 ): Promise<void> {
   if (!memory) return;
-  
+
   // Store original messages in their language (Hinglish)
   const content = messages.join('\n');
 
   // Determine memory type based on content
   const memoryType = determineMemoryType(content, topic);
-  
+
   // Build complete metadata with language preservation
   const metadata: EnhancedMemoryMetadata = {
     memory_type: memoryType,
@@ -147,7 +149,7 @@ export async function storeConversationMemory(
       user_id: userId,
       metadata,
     });
-    
+
     console.log('✅ MemoryStack stored:', {
       type: memoryType,
       significance: metadata.significance,
@@ -169,14 +171,14 @@ export async function storeUserInfo(
   enhancedMetadata?: Partial<EnhancedMemoryMetadata>
 ): Promise<void> {
   if (!memory) return;
-  
+
   const metadata: EnhancedMemoryMetadata = {
     memory_type: 'personal_preference',
     category,
     timestamp: new Date().toISOString(),
     ...enhancedMetadata,
   };
-  
+
   try {
     await memory.createMemory({
       messages: [{ role: 'assistant', content: `User ${category}: ${info}` }],
@@ -199,7 +201,7 @@ export async function storeFact(
   enhancedMetadata?: Partial<EnhancedMemoryMetadata>
 ): Promise<void> {
   if (!memory) return;
-  
+
   const metadata: EnhancedMemoryMetadata = {
     memory_type: 'personal_fact',
     category,
@@ -207,7 +209,7 @@ export async function storeFact(
     significance: 'high', // Facts are generally important
     ...enhancedMetadata,
   };
-  
+
   try {
     await memory.createMemory({
       messages: [{ role: 'assistant', content: fact }],
@@ -237,7 +239,7 @@ export async function storeEmotionalMemory(
   }
 ): Promise<void> {
   if (!memory) return;
-  
+
   const metadata: EnhancedMemoryMetadata = {
     memory_type: 'emotional_moment',
     emotional_context: emotionalContext,
@@ -245,14 +247,14 @@ export async function storeEmotionalMemory(
     significance: emotionalContext.emotional_intensity > 0.7 ? 'high' : 'medium',
     timestamp: new Date().toISOString(),
   };
-  
+
   try {
     await memory.createMemory({
       messages: [{ role: 'assistant', content }],
       user_id: userId,
       metadata,
     });
-    
+
     console.log('💾 Stored emotional memory:', emotionalContext.user_emotion);
   } catch (e) {
     console.error('Failed to store emotional memory:', e);
@@ -270,7 +272,7 @@ export async function getConversationContext(
   }
 ): Promise<string> {
   if (!memory) return '';
-  
+
   try {
     const searchParams: any = {
       query: currentMessage,
@@ -278,12 +280,12 @@ export async function getConversationContext(
       limit: 5,
       mode: 'hybrid',
     };
-    
+
     // Add filters if provided
     if (filters) {
       searchParams.filters = filters;
     }
-    
+
     const results = await memory.searchMemories(searchParams);
 
     if (!results.results || results.results.length === 0) {
@@ -308,7 +310,7 @@ export async function getMemoriesByType(
   limit: number = 10
 ): Promise<any[]> {
   if (!memory) return [];
-  
+
   try {
     const results = await memory.searchMemories({
       user_id: userId,
@@ -333,16 +335,16 @@ export async function getEmotionalMemories(
   limit: number = 5
 ): Promise<any[]> {
   if (!memory) return [];
-  
+
   try {
     const filters: any = {
       memory_type: 'emotional_moment',
     };
-    
+
     if (emotion) {
       filters['emotional_context.user_emotion'] = emotion;
     }
-    
+
     const results = await memory.searchMemories({
       user_id: userId,
       limit,
@@ -388,7 +390,7 @@ export async function getUserProfile(userId: string): Promise<Partial<UserProfil
     for (const mem of results.results) {
       const memType = mem.metadata?.memory_type;
       const category = mem.metadata?.category;
-      
+
       if (memType === 'personal_preference') {
         if (category === 'interest') {
           profile.interests?.push(mem.content);
@@ -427,7 +429,7 @@ export async function getRelevantMemories(
   }
 ): Promise<string[]> {
   if (!memory) return [];
-  
+
   try {
     const searchParams: any = {
       query,
@@ -435,11 +437,11 @@ export async function getRelevantMemories(
       limit,
       mode: 'hybrid',
     };
-    
+
     if (options) {
       searchParams.filters = options;
     }
-    
+
     const results = await memory.searchMemories(searchParams);
 
     if (!results.results || results.results.length === 0) {
@@ -471,7 +473,7 @@ export async function extractAndStoreFacts(
     { regex: /i live in (\w+)/i, category: 'location', type: 'personal_fact' as const },
     { regex: /i'?m from (\w+)/i, category: 'location', type: 'personal_fact' as const },
     { regex: /i'?m (\d+) years old/i, category: 'age', type: 'personal_fact' as const },
-    
+
     // Preferences
     { regex: /i like ([\w\s]+)/i, category: 'interest', type: 'personal_preference' as const },
     { regex: /i love ([\w\s]+)/i, category: 'interest', type: 'personal_preference' as const },
@@ -479,32 +481,32 @@ export async function extractAndStoreFacts(
     { regex: /i prefer ([\w\s]+)/i, category: 'preference', type: 'personal_preference' as const },
     { regex: /my favorite ([\w\s]+) is ([\w\s]+)/i, category: 'favorite', type: 'personal_preference' as const },
     { regex: /mujhe ([\w\s]+) pasand hai/i, category: 'interest', type: 'personal_preference' as const },
-    
+
     // Dislikes
     { regex: /i (?:hate|dislike) ([\w\s]+)/i, category: 'dislike', type: 'personal_dislike' as const },
     { regex: /i don'?t like ([\w\s]+)/i, category: 'dislike', type: 'personal_dislike' as const },
     { regex: /mujhe ([\w\s]+) pasand nahi/i, category: 'dislike', type: 'personal_dislike' as const },
-    
+
     // Goals
     { regex: /i want to ([\w\s]+)/i, category: 'goal', type: 'personal_goal' as const },
     { regex: /i'?m planning to ([\w\s]+)/i, category: 'plan', type: 'personal_goal' as const },
     { regex: /my goal is ([\w\s]+)/i, category: 'goal', type: 'personal_goal' as const },
     { regex: /mai ([\w\s]+) karna chahta/i, category: 'goal', type: 'personal_goal' as const },
-    
+
     // Habits
     { regex: /i usually ([\w\s]+)/i, category: 'habit', type: 'personal_habit' as const },
     { regex: /i always ([\w\s]+)/i, category: 'habit', type: 'personal_habit' as const },
     { regex: /every day i ([\w\s]+)/i, category: 'routine', type: 'personal_habit' as const },
     { regex: /mai hamesha ([\w\s]+)/i, category: 'habit', type: 'personal_habit' as const },
     { regex: /roz mai ([\w\s]+)/i, category: 'routine', type: 'personal_habit' as const },
-    
+
     // Skills
     { regex: /i can ([\w\s]+)/i, category: 'skill', type: 'personal_skill' as const },
     { regex: /i know how to ([\w\s]+)/i, category: 'skill', type: 'personal_skill' as const },
     { regex: /i'?m good at ([\w\s]+)/i, category: 'skill', type: 'personal_skill' as const },
     { regex: /i play ([\w\s]+)/i, category: 'hobby', type: 'personal_skill' as const },
     { regex: /my rating is (\d+)/i, category: 'achievement', type: 'personal_skill' as const },
-    
+
     // Relationships
     { regex: /my (?:friend|dost) ([\w\s]+)/i, category: 'friend', type: 'relationship' as const },
     { regex: /my (?:mom|mother|maa) ([\w\s]+)/i, category: 'family', type: 'relationship' as const },
@@ -517,19 +519,19 @@ export async function extractAndStoreFacts(
       const metadata: EnhancedMemoryMetadata = {
         memory_type: pattern.type,
         category: pattern.category,
-        significance: pattern.type === 'personal_fact' || pattern.type === 'important_date' ? 'critical' : 
-                     pattern.type === 'personal_preference' || pattern.type === 'personal_dislike' ? 'high' : 
-                     'medium',
+        significance: pattern.type === 'personal_fact' || pattern.type === 'important_date' ? 'critical' :
+          pattern.type === 'personal_preference' || pattern.type === 'personal_dislike' ? 'high' :
+            'medium',
         timestamp: new Date().toISOString(),
         ...enhancedMetadata,
       };
-      
+
       const result = await memory.createMemory({
         messages: [{ role: 'assistant', content: match[0] }],
         user_id: userId,
         metadata,
       });
-      
+
       console.log(`✅ MemoryStack extracted ${pattern.type}:`, pattern.category, 'ID:', result?.id || 'unknown');
     }
   }
@@ -538,90 +540,90 @@ export async function extractAndStoreFacts(
 // Helper function to determine memory type from content (Ira-specific)
 function determineMemoryType(content: string, topic: string): EnhancedMemoryMetadata['memory_type'] {
   const lowerContent = content.toLowerCase();
-  
+
   // Personal Information
-  if (lowerContent.includes('name') || lowerContent.includes('age') || 
-      lowerContent.includes('birthday') || lowerContent.includes('location') ||
-      lowerContent.includes('live in') || lowerContent.includes('from')) {
+  if (lowerContent.includes('name') || lowerContent.includes('age') ||
+    lowerContent.includes('birthday') || lowerContent.includes('location') ||
+    lowerContent.includes('live in') || lowerContent.includes('from')) {
     return 'personal_fact';
   }
-  
-  if (lowerContent.includes('like') || lowerContent.includes('prefer') || 
-      lowerContent.includes('favorite') || lowerContent.includes('pasand')) {
+
+  if (lowerContent.includes('like') || lowerContent.includes('prefer') ||
+    lowerContent.includes('favorite') || lowerContent.includes('pasand')) {
     return 'personal_preference';
   }
-  
+
   if (lowerContent.includes('dislike') || lowerContent.includes('hate') ||
-      lowerContent.includes('nahi pasand')) {
+    lowerContent.includes('nahi pasand')) {
     return 'personal_dislike';
   }
-  
-  if (lowerContent.includes('want') || lowerContent.includes('plan') || 
-      lowerContent.includes('goal') || lowerContent.includes('chahta')) {
+
+  if (lowerContent.includes('want') || lowerContent.includes('plan') ||
+    lowerContent.includes('goal') || lowerContent.includes('chahta')) {
     return 'personal_goal';
   }
-  
-  if (lowerContent.includes('usually') || lowerContent.includes('always') || 
-      lowerContent.includes('routine') || lowerContent.includes('hamesha') ||
-      lowerContent.includes('roz') || lowerContent.includes('every day')) {
+
+  if (lowerContent.includes('usually') || lowerContent.includes('always') ||
+    lowerContent.includes('routine') || lowerContent.includes('hamesha') ||
+    lowerContent.includes('roz') || lowerContent.includes('every day')) {
     return 'personal_habit';
   }
-  
+
   if (lowerContent.includes('can') || lowerContent.includes('know how') ||
-      lowerContent.includes('good at') || lowerContent.includes('skill')) {
+    lowerContent.includes('good at') || lowerContent.includes('skill')) {
     return 'personal_skill';
   }
-  
+
   // Emotional & Social
-  if (lowerContent.includes('feel') || lowerContent.includes('emotion') || 
-      lowerContent.includes('happy') || lowerContent.includes('sad') ||
-      lowerContent.includes('excited') || lowerContent.includes('nervous') ||
-      lowerContent.includes('khushi') || lowerContent.includes('dukh')) {
+  if (lowerContent.includes('feel') || lowerContent.includes('emotion') ||
+    lowerContent.includes('happy') || lowerContent.includes('sad') ||
+    lowerContent.includes('excited') || lowerContent.includes('nervous') ||
+    lowerContent.includes('khushi') || lowerContent.includes('dukh')) {
     return 'emotional_moment';
   }
-  
+
   if (lowerContent.includes('friend') || lowerContent.includes('family') ||
-      lowerContent.includes('mom') || lowerContent.includes('dad') ||
-      lowerContent.includes('dost') || lowerContent.includes('relationship')) {
+    lowerContent.includes('mom') || lowerContent.includes('dad') ||
+    lowerContent.includes('dost') || lowerContent.includes('relationship')) {
     return 'relationship';
   }
-  
+
   if (lowerContent.includes('remember when') || lowerContent.includes('that time') ||
-      lowerContent.includes('yaad hai') || lowerContent.includes('woh din')) {
+    lowerContent.includes('yaad hai') || lowerContent.includes('woh din')) {
     return 'shared_experience';
   }
-  
+
   if (lowerContent.includes('haha') || lowerContent.includes('lol') ||
-      lowerContent.includes('funny') || lowerContent.includes('joke') ||
-      lowerContent.includes('mazak')) {
+    lowerContent.includes('funny') || lowerContent.includes('joke') ||
+    lowerContent.includes('mazak')) {
     return 'inside_joke';
   }
-  
+
   // Contextual
   if (lowerContent.includes('morning') || lowerContent.includes('evening') ||
-      lowerContent.includes('night') || lowerContent.includes('subah') ||
-      lowerContent.includes('shaam') || lowerContent.includes('raat')) {
+    lowerContent.includes('night') || lowerContent.includes('subah') ||
+    lowerContent.includes('shaam') || lowerContent.includes('raat')) {
     return 'temporal_pattern';
   }
-  
+
   if (lowerContent.includes('rain') || lowerContent.includes('weather') ||
-      lowerContent.includes('barish') || lowerContent.includes('mausam') ||
-      lowerContent.includes('sunny') || lowerContent.includes('cold')) {
+    lowerContent.includes('barish') || lowerContent.includes('mausam') ||
+    lowerContent.includes('sunny') || lowerContent.includes('cold')) {
     return 'environmental_trigger';
   }
-  
+
   if (lowerContent.includes('hinglish') || lowerContent.includes('yaar') ||
-      lowerContent.includes('arre') || lowerContent.includes('achha') ||
-      topic === 'cultural') {
+    lowerContent.includes('arre') || lowerContent.includes('achha') ||
+    topic === 'cultural') {
     return 'cultural_reference';
   }
-  
+
   // Special
   if (lowerContent.includes('birthday') || lowerContent.includes('anniversary') ||
-      lowerContent.includes('janamdin')) {
+    lowerContent.includes('janamdin')) {
     return 'important_date';
   }
-  
+
   // Default
   return 'conversation_context';
 }
