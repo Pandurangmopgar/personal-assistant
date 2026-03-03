@@ -315,12 +315,14 @@ EMOJI RULE: Emoji sirf tab use kar jab genuinely zaroorat ho — hassi, pyaar, s
           // ================================================================
           let finalAssistantMessage = assistantMessage;
           let llmDidStore = false; // Track if LLM called store_memory
+          let llmDidRecall = false; // Track if LLM called recall_memories
 
           if (toolCalls && toolCalls.length > 0) {
             console.log('🔧 LLM called functions:', toolCalls.length);
 
-            // Check if store_memory was called
+            // Check which tools were called
             llmDidStore = toolCalls.some((tc: any) => tc.function.name === 'store_memory');
+            llmDidRecall = toolCalls.some((tc: any) => tc.function.name === 'recall_memories');
 
             // Get current time context for metadata
             const now = new Date();
@@ -457,18 +459,20 @@ EMOJI RULE: Emoji sirf tab use kar jab genuinely zaroorat ho — hassi, pyaar, s
 
             // ================================================================
             // STEP 8b: Fallback Storage (if LLM didn't call store_memory)
-            // This ensures important facts are ALWAYS captured, even when
-            // the LLM doesn't decide to store them via tool calling.
+            // SKIP if recall was used — the response contains recalled
+            // memories which would create duplicates if re-stored!
             // ================================================================
-            if (!llmDidStore) {
+            if (!llmDidStore && !llmDidRecall) {
               const storageCheck = shouldStoreMessage(message);
               if (storageCheck.shouldStore) {
                 try {
                   console.log('🛡️ Fallback storage (LLM skipped store_memory)...');
-                  await extractAndStoreFacts(userId, message, finalAssistantMessage);
+                  // Only extract facts from USER's message, not the assistant
+                  // response which may contain recalled memories
+                  await extractAndStoreFacts(userId, message, '');
                   await storeConversationMemory(
                     userId,
-                    [message, finalAssistantMessage],
+                    [message],
                     extractTopic(message),
                     extractKeywords(message)
                   );
@@ -478,6 +482,8 @@ EMOJI RULE: Emoji sirf tab use kar jab genuinely zaroorat ho — hassi, pyaar, s
               } else {
                 console.log('⏭️  Skipping fallback storage:', storageCheck.reason);
               }
+            } else if (llmDidRecall && !llmDidStore) {
+              console.log('⏭️  Skipping fallback storage: recall was used (avoids re-storing recalled content)');
             }
 
             // Split response into maximum 2-3 messages (WhatsApp style)
