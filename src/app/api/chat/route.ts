@@ -29,7 +29,7 @@ import { shouldStoreMessage } from '@/lib/memory-signals';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, conversationHistory, userId = 'pandurang' } = await request.json();
+    const { message, conversationHistory, userId = 'pandurang', imageData } = await request.json();
 
     if (!message) {
       return NextResponse.json(
@@ -110,10 +110,23 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    messages.push({
-      role: 'user',
-      content: message,
-    });
+    // Build the current user message — use multipart content if image is attached
+    if (imageData) {
+      // Multipart content: text + image for vision models
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: message || 'What do you see in this image? React naturally in Hinglish.' },
+          { type: 'image_url', image_url: { url: imageData, detail: 'low' } },
+        ],
+      });
+      console.log('🖼️ Image attached to message (base64 length:', imageData.length, ')');
+    } else {
+      messages.push({
+        role: 'user',
+        content: message,
+      });
+    }
 
     // ========================================================================
     // STEP 6: Call Azure OpenAI with Enhanced Prompt

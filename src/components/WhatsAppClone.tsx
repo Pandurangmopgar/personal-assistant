@@ -13,6 +13,7 @@ type Message = {
   text?: string;
   audioUrl?: string;
   audioDuration?: number;
+  imageUrl?: string; // base64 data URL or object URL for image messages
   sender: 'me' | 'other';
   timestamp: string;
   date?: string; // Date like "February 23, 2026"
@@ -20,7 +21,7 @@ type Message = {
   status: 'sent' | 'delivered' | 'read';
   isEmoji?: boolean;
   replyTo?: string;
-  type: 'text' | 'audio';
+  type: 'text' | 'audio' | 'image';
 };
 
 type User = {
@@ -1459,8 +1460,11 @@ export default function WhatsAppClone() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioTranscript, setAudioTranscript] = useState<string>(''); // For Speech-to-Text
   const [isTyping, setIsTyping] = useState(false);
   const [activeMessageMenu, setActiveMessageMenu] = useState<string | null>(null);
+
+  const recognitionRef = useRef<any>(null); // Reference to SpeechRecognition instance
 
   const getDateLabel = (dateStr: string) => {
     if (!dateStr) return '';
@@ -1783,6 +1787,7 @@ export default function WhatsAppClone() {
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
+      setAudioTranscript(''); // Reset transcript
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -1792,6 +1797,28 @@ export default function WhatsAppClone() {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
       };
+
+      // Set up Speech Recognition
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'hi-IN'; // Default to Hinglish/Hindi
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event: any) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+          }
+          setAudioTranscript(prev => prev + transcript);
+        };
+
+        recognition.onerror = (e: any) => console.error('Speech recognition error:', e);
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      }
 
       mediaRecorder.start();
       setIsRecording(true);
@@ -1813,12 +1840,14 @@ export default function WhatsAppClone() {
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (recognitionRef.current) recognitionRef.current.stop();
     }
   };
 
   const cancelRecording = () => {
     stopRecording();
     setAudioBlob(null);
+    setAudioTranscript('');
     setRecordingDuration(0);
     chunksRef.current = [];
   };
@@ -1830,10 +1859,11 @@ export default function WhatsAppClone() {
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (recognitionRef.current) recognitionRef.current.stop();
     }
 
     // Wait a bit for the onstop event to fire and blob to be created
-    setTimeout(() => {
+    setTimeout(async () => {
       const blob = audioBlob || (chunksRef.current.length > 0 ? new Blob(chunksRef.current, { type: 'audio/webm' }) : null);
 
       if (!blob) {
@@ -1845,11 +1875,15 @@ export default function WhatsAppClone() {
       const audioUrl = URL.createObjectURL(blob);
       const now = new Date();
       const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+      const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+      const currentDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
       const newMessage: Message = {
         id: Date.now().toString(),
         sender: 'me',
         timestamp: timeString,
+        date: currentDate,
+        dayOfWeek: currentDay,
         status: 'sent',
         type: 'audio',
         audioUrl: audioUrl,
@@ -1862,6 +1896,8 @@ export default function WhatsAppClone() {
       setAudioBlob(null);
       setRecordingDuration(0);
       chunksRef.current = [];
+      const transcript = audioTranscript.trim();
+      setAudioTranscript('');
 
       // Simulate status updates
       setTimeout(() => {
@@ -1872,15 +1908,64 @@ export default function WhatsAppClone() {
         setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, status: 'read' } : m));
       }, 2000);
 
+      // Start typing indicator
+      setTimeout(() => setIsTyping(true), 2500);
+
+      try {
+        // Use transcription if available, else generic fallback
+        const messageText = transcript
+          ? `(Voice message transcript: "${transcript}")`
+          : '(User sent a voice message but transcription failed or was empty.)';
+
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: messageText,
+            conversationHistory: messages.filter(m => m.type === 'text' || m.type === 'image' || m.type === 'audio').slice(-10),
+          }),
+        });
+
+        const data = await response.json();
+        setIsTyping(false);
+
+        if (data.success && data.messages && Array.isArray(data.messages)) {
+          for (let i = 0; i < data.messages.length; i++) {
+            if (i > 0) {
+              setIsTyping(true);
+              await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+              setIsTyping(false);
+            }
+
+            const replyDate = new Date();
+            const replyTime = replyDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+            const replyDateStr = replyDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const replyDay = replyDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+            const replyMsg: Message = {
+              id: (Date.now() + i).toString(),
+              text: data.messages[i],
+              sender: 'other',
+              timestamp: replyTime,
+              date: replyDateStr,
+              dayOfWeek: replyDay,
+              status: 'read',
+              type: 'text',
+            };
+            setMessages(prev => [...prev, replyMsg]);
+          }
+        }
+      } catch (error) {
+        console.error('Audio chat error:', error);
+        setIsTyping(false);
+      }
+
     }, 200);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Create a local object URL for preview
-    const fileUrl = URL.createObjectURL(file);
 
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
@@ -1891,31 +1976,107 @@ export default function WhatsAppClone() {
     });
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'me',
-      timestamp: timeString,
-      date: currentDate,
-      dayOfWeek: currentDay,
-      status: 'sent',
-      type: 'text', // We don't have a specific type for images/docs yet, so we'll use text with the URL
-      text: type === 'image' ? `📷 Image attached: ${file.name}` : `📄 Document attached: ${file.name}`,
-    };
+    if (type === 'document') {
+      // Document: just show as text message
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        sender: 'me',
+        timestamp: timeString,
+        date: currentDate,
+        dayOfWeek: currentDay,
+        status: 'sent',
+        type: 'text',
+        text: `📄 ${file.name}`,
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setShowAttachMenu(false);
+      e.target.value = '';
+      return;
+    }
 
-    setMessages(prev => [...prev, newMessage]);
+    // Image: convert to base64 and send to LLM
     setShowAttachMenu(false);
 
-    // Reset input
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target?.result as string;
+      if (!base64Data) return;
+
+      // Create image message with preview
+      const msgId = Date.now().toString();
+      const imageMessage: Message = {
+        id: msgId,
+        sender: 'me',
+        timestamp: timeString,
+        date: currentDate,
+        dayOfWeek: currentDay,
+        status: 'sent',
+        type: 'image',
+        imageUrl: base64Data,
+      };
+
+      setMessages(prev => [...prev, imageMessage]);
+
+      // Status updates
+      setTimeout(() => {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'delivered' } : m));
+      }, 1000);
+      setTimeout(() => {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'read' } : m));
+      }, 2000);
+
+      // Show typing indicator
+      setTimeout(() => setIsTyping(true), 2500);
+
+      // Send to API with image data
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: '(User sent an image)',
+            imageData: base64Data,
+            conversationHistory: messages.filter(m => m.type === 'text' || m.type === 'image').slice(-10),
+          }),
+        });
+
+        const data = await response.json();
+        setIsTyping(false);
+
+        if (data.success && data.messages && Array.isArray(data.messages)) {
+          for (let i = 0; i < data.messages.length; i++) {
+            if (i > 0) {
+              setIsTyping(true);
+              await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+              setIsTyping(false);
+            }
+
+            const replyDate = new Date();
+            const replyTime = replyDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+            const replyDateStr = replyDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const replyDay = replyDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+            const replyMsg: Message = {
+              id: (Date.now() + i).toString(),
+              text: data.messages[i],
+              sender: 'other',
+              timestamp: replyTime,
+              date: replyDateStr,
+              dayOfWeek: replyDay,
+              status: 'read',
+              type: 'text',
+            };
+            setMessages(prev => [...prev, replyMsg]);
+          }
+        }
+      } catch (error) {
+        console.error('Image chat error:', error);
+        setIsTyping(false);
+      }
+    };
+
+    reader.readAsDataURL(file);
     e.target.value = '';
-
-    // Simulate status updates
-    setTimeout(() => {
-      setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' } : m));
-    }, 1000);
-
-    setTimeout(() => {
-      setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, status: 'read' } : m));
-    }, 2000);
   };
 
   const formatDuration = (seconds: number) => {
@@ -2021,7 +2182,22 @@ export default function WhatsAppClone() {
                         )}
 
                         {/* Message Content */}
-                        {msg.type === 'text' ? (
+                        {msg.type === 'image' ? (
+                          <div className="-mx-1 -mt-0.5 mb-1">
+                            <img
+                              src={msg.imageUrl}
+                              alt="Shared image"
+                              className="rounded-lg max-w-full max-h-[300px] object-cover cursor-pointer"
+                              style={{ minWidth: '200px' }}
+                              onClick={() => window.open(msg.imageUrl, '_blank')}
+                            />
+                            {msg.text && (
+                              <div className="break-words whitespace-pre-wrap pr-20 pb-1 pl-1 pt-1">
+                                {msg.text}
+                              </div>
+                            )}
+                          </div>
+                        ) : msg.type === 'text' ? (
                           <div className={`break-words whitespace-pre-wrap ${msg.isEmoji ? 'p-2' : 'pr-20 pb-1 pl-1'}`}>
                             {msg.text}
                           </div>
