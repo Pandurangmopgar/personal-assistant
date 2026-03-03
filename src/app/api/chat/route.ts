@@ -163,6 +163,7 @@ KYA NAHI KARTI:
 - Lambe paragraphs mat likh — conversational rakh
 - Zyada helpful ya instructive mat ban
 - Ek saath bahut messages mat bhej
+- **KABHI BHI markdown formatting mat use kar** — no **, no *, no bold, no italic. Plain text mein likh jaise WhatsApp pe likhte hain
 - Bas ek dost ki tarah normally baat kar
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -487,13 +488,14 @@ EMOJI RULE: Emoji sirf tab use kar jab genuinely zaroorat ho — hassi, pyaar, s
             }
 
             // Split response into maximum 2-3 messages (WhatsApp style)
-            const messageLines = finalAssistantMessage.split('\n').filter((line: string) => line.trim());
+            const cleanedMessage = stripMarkdown(finalAssistantMessage);
+            const messageLines = cleanedMessage.split('\n').filter((line: string) => line.trim());
 
             // Limit to max 3 messages for friendly conversation
             const limitedMessages = messageLines.slice(0, 3);
 
             return NextResponse.json({
-              messages: limitedMessages.length > 1 ? limitedMessages : [finalAssistantMessage],
+              messages: limitedMessages.length > 1 ? limitedMessages : [cleanedMessage],
               success: true,
             });
           }
@@ -607,13 +609,14 @@ ${memoryContext ? `\nThings you remember:\n${memoryContext}` : ''}`;
             }
 
             // Split response into maximum 2-3 messages (WhatsApp style)
-            const messageLines = assistantMessage.split('\n').filter((line: string) => line.trim());
+            const cleanedBedrock = stripMarkdown(assistantMessage);
+            const messageLines = cleanedBedrock.split('\n').filter((line: string) => line.trim());
 
             // Limit to max 3 messages for friendly conversation
             const limitedMessages = messageLines.slice(0, 3);
 
             return NextResponse.json({
-              messages: limitedMessages.length > 1 ? limitedMessages : [assistantMessage],
+              messages: limitedMessages.length > 1 ? limitedMessages : [cleanedBedrock],
               success: true,
             });
           }
@@ -650,7 +653,7 @@ ${memoryContext ? `\nThings you remember:\n${memoryContext}` : ''}`;
     }
 
     return NextResponse.json({
-      messages: responses,
+      messages: responses.map(r => stripMarkdown(r)),
       success: true,
     });
   } catch (error: any) {
@@ -666,6 +669,17 @@ ${memoryContext ? `\nThings you remember:\n${memoryContext}` : ''}`;
 }
 
 // Helper function to extract topic from message
+// Strip markdown formatting from LLM responses (**, *, etc.)
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold** → bold
+    .replace(/\*(.+?)\*/g, '$1')      // *italic* → italic
+    .replace(/__(.+?)__/g, '$1')      // __underline__ → underline
+    .replace(/_(.+?)_/g, '$1')        // _italic_ → italic
+    .replace(/~~(.+?)~~/g, '$1')      // ~~strikethrough~~ → strikethrough
+    .replace(/`(.+?)`/g, '$1');       // `code` → code
+}
+
 function extractTopic(message: string): string {
   const lowerMessage = message.toLowerCase();
 
