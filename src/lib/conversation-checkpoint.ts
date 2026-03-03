@@ -22,8 +22,8 @@ export interface ConversationCheckpoint {
 
 // Check if we need to create a checkpoint
 export function shouldCreateCheckpoint(messageCount: number): boolean {
-  // Create checkpoint every 50 messages
-  return messageCount > 0 && messageCount % 50 === 0;
+  // Create checkpoint every 250 messages
+  return messageCount > 0 && messageCount % 250 === 0;
 }
 
 // Create a conversation summary using LLM
@@ -39,17 +39,17 @@ export async function createConversationSummary(
   try {
     // Take last 50 messages for summary
     const recentMessages = messages.slice(-50);
-    
+
     // Build conversation text
     const conversationText = recentMessages
       .map(msg => `${msg.sender === 'me' ? 'User' : 'Ira'}: ${msg.text}`)
       .join('\n');
-    
-    const summaryPrompt = `Summarize this WhatsApp conversation between User and Ira in 3-4 sentences. Focus on:
-1. Main topics discussed
-2. Important facts shared
-3. Emotional tone
-4. Any plans or commitments made
+
+    const summaryPrompt = `Yeh User aur Ira ke beech WhatsApp conversation ka summary banao 3-4 lines mein Hinglish mein. Focus kar:
+1. Kya kya topics discuss hue
+2. Kya important facts share hue (naam, preferences, plans)
+3. Emotional tone kaisa tha (khushi, mazaak, serious, sad)
+4. Koi plans ya commitments bane toh woh bhi likho
 
 Conversation:
 ${conversationText}
@@ -57,7 +57,7 @@ ${conversationText}
 Summary:`;
 
     const url = `${azureConfig.endpoint}/openai/deployments/${azureConfig.deployment}/chat/completions?api-version=${azureConfig.apiVersion}`;
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -68,7 +68,7 @@ Summary:`;
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that creates concise conversation summaries.',
+            content: 'Tu ek helper hai jo conversations ka concise summary Hinglish mein banata hai. Summary natural Hinglish mein likh — jaise ek dost ko bata raha ho ki conversation mein kya hua.',
           },
           {
             role: 'user',
@@ -83,7 +83,7 @@ Summary:`;
       const data = await response.json();
       return data.choices?.[0]?.message?.content?.trim() || 'Summary unavailable';
     }
-    
+
     return 'Summary unavailable';
   } catch (error) {
     console.error('Failed to create summary:', error);
@@ -98,16 +98,16 @@ export function extractCheckpointData(messages: any[]): {
   emotionalTone: string;
 } {
   const recentMessages = messages.slice(-50);
-  
+
   // Extract topics (simple keyword extraction)
   const topics = new Set<string>();
   const facts: string[] = [];
   let positiveCount = 0;
   let negativeCount = 0;
-  
+
   recentMessages.forEach(msg => {
     const text = msg.text?.toLowerCase() || '';
-    
+
     // Topic detection
     if (text.includes('food') || text.includes('khana') || text.includes('dinner') || text.includes('lunch')) {
       topics.add('food');
@@ -127,7 +127,7 @@ export function extractCheckpointData(messages: any[]): {
     if (text.includes('weather') || text.includes('rain') || text.includes('barish')) {
       topics.add('weather');
     }
-    
+
     // Fact detection (simple patterns)
     if (text.includes('my name is') || text.includes('naam hai')) {
       facts.push(msg.text);
@@ -138,7 +138,7 @@ export function extractCheckpointData(messages: any[]): {
     if (text.includes('i like') || text.includes('pasand hai')) {
       facts.push(msg.text);
     }
-    
+
     // Emotional tone
     if (text.includes('😊') || text.includes('😂') || text.includes('happy') || text.includes('khushi')) {
       positiveCount++;
@@ -147,7 +147,7 @@ export function extractCheckpointData(messages: any[]): {
       negativeCount++;
     }
   });
-  
+
   // Determine overall emotional tone
   let emotionalTone = 'neutral';
   if (positiveCount > negativeCount * 2) {
@@ -157,7 +157,7 @@ export function extractCheckpointData(messages: any[]): {
   } else if (positiveCount > 0 || negativeCount > 0) {
     emotionalTone = 'mixed';
   }
-  
+
   return {
     keyTopics: Array.from(topics).slice(0, 5),
     importantFacts: facts.slice(0, 5),
@@ -177,26 +177,26 @@ export async function createCheckpoint(
   }
 ): Promise<ConversationCheckpoint | null> {
   if (!memory) return null;
-  
+
   try {
     const recentMessages = messages.slice(-50);
-    
+
     if (recentMessages.length === 0) return null;
-    
+
     // Create summary
     const summary = await createConversationSummary(recentMessages, azureConfig);
-    
+
     // Extract data
     const { keyTopics, importantFacts, emotionalTone } = extractCheckpointData(recentMessages);
-    
+
     // Get date range
-    const startDate = recentMessages[0].date || new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const startDate = recentMessages[0].date || new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
     const endDate = recentMessages[recentMessages.length - 1].date || startDate;
-    
+
     // Create checkpoint object
     const checkpoint: ConversationCheckpoint = {
       id: `checkpoint-${Date.now()}`,
@@ -214,12 +214,12 @@ export async function createCheckpoint(
       },
       createdAt: new Date().toISOString(),
     };
-    
+
     // Store in MemoryStack as a special memory type
     await memory.createMemory({
-      messages: [{ 
-        role: 'assistant', 
-        content: `Conversation Checkpoint (${checkpoint.messageCount} messages):\n\n${summary}\n\nTopics: ${keyTopics.join(', ')}\nTone: ${emotionalTone}` 
+      messages: [{
+        role: 'assistant',
+        content: `Conversation Checkpoint (${checkpoint.messageCount} messages):\n\n${summary}\n\nTopics: ${keyTopics.join(', ')}\nTone: ${emotionalTone}`
       }],
       user_id: userId,
       metadata: {
@@ -232,14 +232,14 @@ export async function createCheckpoint(
         significance: 'high',
       },
     });
-    
+
     console.log('📍 Created checkpoint:', {
       id: checkpoint.id,
       messages: checkpoint.messageCount,
       topics: keyTopics,
       tone: emotionalTone,
     });
-    
+
     return checkpoint;
   } catch (error) {
     console.error('Failed to create checkpoint:', error);
@@ -253,7 +253,7 @@ export async function getRecentCheckpoints(
   limit: number = 3
 ): Promise<string[]> {
   if (!memory) return [];
-  
+
   try {
     const results = await memory.searchMemories({
       query: 'conversation checkpoint summary',
@@ -264,11 +264,11 @@ export async function getRecentCheckpoints(
         memory_type: 'conversation_checkpoint',
       },
     });
-    
+
     if (!results.results || results.results.length === 0) {
       return [];
     }
-    
+
     return results.results.map((mem: any) => mem.content);
   } catch (error) {
     console.error('Failed to get checkpoints:', error);
@@ -279,10 +279,10 @@ export async function getRecentCheckpoints(
 // Get checkpoint context for LLM
 export async function getCheckpointContext(userId: string): Promise<string> {
   const checkpoints = await getRecentCheckpoints(userId, 2);
-  
+
   if (checkpoints.length === 0) {
     return '';
   }
-  
+
   return `\n\nPrevious conversation context:\n${checkpoints.join('\n\n')}`;
 }
