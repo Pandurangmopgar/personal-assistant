@@ -1763,9 +1763,16 @@ export default function WhatsAppClone() {
       });
       const replyDay = replyDate.toLocaleDateString('en-US', { weekday: 'long' });
 
+      const hinglishErrors = [
+        "arre yaar, samajh nahi aaya 😅 phirse bol na",
+        "oops kuch gadbad ho gayi yaar, ek baar phir se try kar na 😅",
+        "yaar thoda hang ho gaya mereko, phirse bol na please 😅",
+      ];
+      const errorText = hinglishErrors[Math.floor(Math.random() * hinglishErrors.length)];
+
       const replyMessage: Message = {
         id: Date.now().toString(),
-        text: "Sorry, I encountered an error. Please try again.",
+        text: errorText,
         sender: 'other',
         timestamp: replyTime,
         date: replyDateStr, // Today's date
