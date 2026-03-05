@@ -141,11 +141,16 @@ export async function storeConversationMemory(
   };
 
   try {
+    const memMessages: { role: string; content: string }[] = [
+      { role: 'user', content: messages[0] },
+    ];
+    // Only add assistant message if it exists and is non-empty
+    if (messages[1] && messages[1].trim()) {
+      memMessages.push({ role: 'assistant', content: messages[1] });
+    }
+
     const result = await memory.createMemory({
-      messages: [
-        { role: 'user', content: messages[0] },
-        { role: 'assistant', content: messages[1] || '' }
-      ],
+      messages: memMessages,
       user_id: userId,
       metadata,
     });

@@ -109,11 +109,32 @@ export async function proactiveRecall(
 
   const lowerMessage = message.toLowerCase();
 
+  // ---- SMART QUERY: Detect vague messages and use conversation context instead ----
+  const vaguePatterns = /^(acch[e]*\s*se|sahi\s*se|dhang\s*se|theek\s*se|puri\s*tarah|detail\s*mein|bata\s*(na|yr|yaar)?|yaad\s*kar|yaad\s*kr|haan\s*wahi|wahi\s*bata|bol\s*na|soch\s*ke\s*bata|phirse\s*bata|fir\s*se\s*bata|aur\s*bata|sab\s*bata)/i;
+  const isVague = vaguePatterns.test(lowerMessage.replace(/[^a-z\s]/g, '').trim()) || lowerMessage.length < 15;
+
+  let searchQuery = message;
+
+  if (isVague && conversationHistory.length >= 2) {
+    // Use last 3-5 user messages as the search query (the actual topic)
+    const recentUserMessages = conversationHistory
+      .filter((msg: any) => msg.sender === 'user' || msg.role === 'user')
+      .slice(-5)
+      .map((msg: any) => msg.text || msg.content || '')
+      .filter((text: string) => text.length > 10) // Skip short fillers
+      .join(' ');
+
+    if (recentUserMessages.length > 15) {
+      searchQuery = recentUserMessages;
+      console.log('🎯 Vague message detected! Using conversation topic:', searchQuery.substring(0, 80) + '...');
+    }
+  }
+
   try {
-    // STRATEGY 1: Direct semantic search with user's message
-    // This is the primary strategy - let MemoryStack's semantic search do the work
+    // STRATEGY 1: Direct semantic search with user's message (or resolved topic)
+    console.log('🧠 Proactive search query:', searchQuery.substring(0, 80));
     const semanticResults = await memory.searchMemories({
-      query: message, // Use the actual user message for semantic matching
+      query: searchQuery,
       user_id: userId,
       limit: 15,
       mode: 'hybrid', // Hybrid combines semantic + keyword matching
@@ -182,6 +203,48 @@ export async function proactiveRecall(
       );
 
       memories.push(...contextMemories);
+    }
+
+    // STRATEGY 4: Recent important memories for FOLLOW-UP
+    // Fetch yesterday's important events so Ira can ask "interview kaisa gaya?"
+    try {
+      const followUpResults = await memory.searchMemories({
+        query: 'interview exam plan mood nervous excited important event goal date',
+        user_id: userId,
+        limit: 10,
+        mode: 'hybrid',
+      });
+
+      const nowMs = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      const twoDaysMs = 48 * 60 * 60 * 1000;
+
+      const recentImportant = (followUpResults.results || [])
+        .filter((mem: any) => {
+          const ts = mem.metadata?.timestamp;
+          if (!ts) return false;
+          const age = nowMs - new Date(ts).getTime();
+          // Only memories from last 6-48 hours (not too old, not from this session)
+          const sig = mem.metadata?.significance;
+          return age > 6 * 60 * 60 * 1000 && age < twoDaysMs &&
+            (sig === 'critical' || sig === 'high');
+        })
+        .map((mem: any) =>
+          enrichMemoryWithTimeContext({
+            content: mem.content,
+            recallReason: 'follow_up',
+            confidence: 0.85,
+            memoryType: mem.metadata?.memory_type || 'unknown',
+            metadata: mem.metadata,
+          })
+        );
+
+      if (recentImportant.length > 0) {
+        console.log('📋 Follow-up memories found:', recentImportant.length);
+      }
+      memories.push(...recentImportant);
+    } catch (followUpError) {
+      // Don't block on follow-up search failure
     }
 
     // Rank and deduplicate
